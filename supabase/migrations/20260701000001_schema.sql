@@ -5,6 +5,9 @@
 --
 -- This file only creates the tables, enums and indexes.
 -- Row-Level Security lives in the next migration (…_rls.sql) so it's easy to read.
+--
+-- Safe to re-run: everything is guarded with "if not exists" so running this
+-- twice does nothing the second time (no scary "already exists" errors).
 -- ============================================================================
 
 -- gen_random_uuid() lives in the pgcrypto extension.
@@ -13,16 +16,31 @@ create extension if not exists pgcrypto;
 -- ── Enums ───────────────────────────────────────────────────────────────────
 -- These are the fixed sets of values used by status/category/priority columns.
 -- To add a new option later: `alter type <name> add value '<new>';`
-create type project_status as enum ('backlog', 'active', 'in_review', 'done', 'archived');
-create type para_category  as enum ('project', 'area', 'resource', 'archive');
-create type task_status    as enum ('todo', 'in_progress', 'blocked', 'done');
-create type task_priority  as enum ('low', 'medium', 'high');
-create type quote_status   as enum ('draft', 'sent', 'accepted', 'declined');
+-- The DO/EXCEPTION blocks make each `create type` a no-op if it already exists.
+do $$ begin
+  create type project_status as enum ('backlog', 'active', 'in_review', 'done', 'archived');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type para_category as enum ('project', 'area', 'resource', 'archive');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type task_status as enum ('todo', 'in_progress', 'blocked', 'done');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type task_priority as enum ('low', 'medium', 'high');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type quote_status as enum ('draft', 'sent', 'accepted', 'declined');
+exception when duplicate_object then null; end $$;
 
 -- ── profiles ────────────────────────────────────────────────────────────────
 -- Extends Supabase's built-in auth.users with app-facing fields.
 -- A row is created automatically on signup (see …_profile_trigger.sql).
-create table profiles (
+create table if not exists profiles (
   id         uuid primary key references auth.users (id) on delete cascade,
   full_name  text,
   role       text,
@@ -31,7 +49,7 @@ create table profiles (
 );
 
 -- ── clients ─────────────────────────────────────────────────────────────────
-create table clients (
+create table if not exists clients (
   id         uuid primary key default gen_random_uuid(),
   name       text not null,
   company    text,
@@ -44,7 +62,7 @@ create table clients (
 -- ── projects ────────────────────────────────────────────────────────────────
 -- Deleting a client cascades to its projects (and onward to tasks/quotes).
 -- Deletion is always confirmed in the UI before it happens.
-create table projects (
+create table if not exists projects (
   id            uuid primary key default gen_random_uuid(),
   client_id     uuid not null references clients (id) on delete cascade,
   title         text not null,
@@ -58,7 +76,7 @@ create table projects (
 
 -- ── tasks ───────────────────────────────────────────────────────────────────
 -- assignee_id is nullable; if a profile is removed the task stays but unassigns.
-create table tasks (
+create table if not exists tasks (
   id          uuid primary key default gen_random_uuid(),
   project_id  uuid not null references projects (id) on delete cascade,
   title       text not null,
@@ -73,7 +91,7 @@ create table tasks (
 -- ── quotes ──────────────────────────────────────────────────────────────────
 -- project_id is optional (a quote can exist for a client with no project yet).
 -- subtotal/total are stored in the client's currency as plain decimals.
-create table quotes (
+create table if not exists quotes (
   id         uuid primary key default gen_random_uuid(),
   client_id  uuid not null references clients (id) on delete cascade,
   project_id uuid references projects (id) on delete set null,
@@ -88,7 +106,7 @@ create table quotes (
 -- ── quote_line_items ────────────────────────────────────────────────────────
 -- amount is normally quantity * rate; it's stored so historical quotes never
 -- change if a preset rate is edited later. `position` controls display order.
-create table quote_line_items (
+create table if not exists quote_line_items (
   id       uuid primary key default gen_random_uuid(),
   quote_id uuid not null references quotes (id) on delete cascade,
   label    text not null,
@@ -102,7 +120,7 @@ create table quote_line_items (
 -- ── rate_presets ────────────────────────────────────────────────────────────
 -- Reusable, editable rates the calculator offers so you don't retype them.
 -- Seeded with placeholders in …_seed_rate_presets.sql — edit to your real rates.
-create table rate_presets (
+create table if not exists rate_presets (
   id           uuid primary key default gen_random_uuid(),
   label        text not null,
   unit         text not null,
@@ -111,9 +129,9 @@ create table rate_presets (
 );
 
 -- ── Indexes on foreign keys (keeps lookups fast as data grows) ───────────────
-create index idx_projects_client_id       on projects (client_id);
-create index idx_tasks_project_id         on tasks (project_id);
-create index idx_tasks_assignee_id        on tasks (assignee_id);
-create index idx_quotes_client_id         on quotes (client_id);
-create index idx_quotes_project_id        on quotes (project_id);
-create index idx_quote_line_items_quote_id on quote_line_items (quote_id);
+create index if not exists idx_projects_client_id        on projects (client_id);
+create index if not exists idx_tasks_project_id          on tasks (project_id);
+create index if not exists idx_tasks_assignee_id         on tasks (assignee_id);
+create index if not exists idx_quotes_client_id          on quotes (client_id);
+create index if not exists idx_quotes_project_id         on quotes (project_id);
+create index if not exists idx_quote_line_items_quote_id on quote_line_items (quote_id);

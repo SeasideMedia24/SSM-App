@@ -19,6 +19,8 @@ end;
 $$;
 
 -- Fire the function after each new row in auth.users.
+-- Drop-then-create so this file is safe to re-run.
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
