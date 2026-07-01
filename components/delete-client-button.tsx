@@ -5,52 +5,54 @@
 
 import { useState } from 'react';
 import { useFormStatus } from 'react-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import { deleteClient } from '@/app/(app)/clients/actions';
+import { Button } from '@/components/ui/button';
 
 function ConfirmButton() {
   const { pending } = useFormStatus();
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-60"
-    >
+    <Button type="submit" variant="danger" size="sm" disabled={pending}>
       {pending ? 'Deleting…' : 'Yes, delete'}
-    </button>
+    </Button>
   );
 }
 
 export function DeleteClientButton({ clientId, clientName }: { clientId: string; clientName: string }) {
   const [confirming, setConfirming] = useState(false);
 
-  if (!confirming) {
-    return (
-      <button
-        type="button"
-        onClick={() => setConfirming(true)}
-        className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
-      >
-        Delete client
-      </button>
-    );
-  }
-
   return (
-    <div className="flex items-center gap-3 rounded-md border border-red-200 bg-red-50 px-3 py-2">
-      <span className="text-sm text-red-700">
-        Delete <span className="font-medium">{clientName}</span> and all its projects and quotes?
-      </span>
-      <form action={deleteClient}>
-        <input type="hidden" name="id" value={clientId} />
-        <ConfirmButton />
-      </form>
-      <button
-        type="button"
-        onClick={() => setConfirming(false)}
-        className="text-sm text-slate-500 hover:text-slate-700"
-      >
-        Cancel
-      </button>
-    </div>
+    <AnimatePresence mode="wait" initial={false}>
+      {!confirming ? (
+        <motion.div key="trigger" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <Button variant="secondary" size="sm" onClick={() => setConfirming(true)} className="!text-red-600 hover:!border-red-300 hover:!bg-red-50">
+            Delete client
+          </Button>
+        </motion.div>
+      ) : (
+        <motion.div
+          key="confirm"
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.96 }}
+          className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2"
+        >
+          <span className="text-sm text-red-700">
+            Delete <span className="font-medium">{clientName}</span> and all its projects and quotes?
+          </span>
+          <form action={deleteClient}>
+            <input type="hidden" name="id" value={clientId} />
+            <ConfirmButton />
+          </form>
+          <button
+            type="button"
+            onClick={() => setConfirming(false)}
+            className="text-sm text-slate-500 hover:text-slate-700"
+          >
+            Cancel
+          </button>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

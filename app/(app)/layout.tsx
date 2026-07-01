@@ -21,9 +21,11 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-[#f6f9fb]">
       <Sidebar userEmail={user.email ?? ''} />
-      <main className="flex-1 overflow-y-auto">
+      <main className="relative flex-1 overflow-y-auto">
+        {/* Thin coastal gradient strip that reaches across the top of the page */}
+        <div className="brand-gradient h-1.5 w-full" />
         <div className="mx-auto max-w-6xl px-8 py-8">{children}</div>
       </main>
     </div>

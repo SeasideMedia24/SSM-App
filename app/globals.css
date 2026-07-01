@@ -1,12 +1,84 @@
 @import "tailwindcss";
 
-/* Calm, light internal-tool theme. We intentionally keep a single light theme
-   for v1 (no auto dark mode) so the UI stays simple and consistent. */
-@theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ============================================================================
+   Seaside Media brand theme (colors pulled from seasidemedia.co)
+   Coastal palette: aqua → teal → deep sea, grounded on navy ink.
+   These names become Tailwind utilities, e.g. bg-aqua, text-sea, border-teal.
+   ============================================================================ */
+@theme {
+  --color-aqua: #78d6d0;
+  --color-aqua-light: #a7e6e1;
+  --color-teal: #55a49d;
+  --color-sea: #36838c;
+  --color-deep: #1c687d;
+  --color-navy: #19263d;
+  --color-ink: #030b19;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-bebas), "Bebas Neue", ui-sans-serif, sans-serif;
+
+  /* Signature animated gradient timing */
+  --animate-gradient: gradient-pan 14s ease infinite;
+  --animate-float: float 7s ease-in-out infinite;
 }
 
+/* Keyframes ---------------------------------------------------------------- */
+@keyframes gradient-pan {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+}
+
+/* Base --------------------------------------------------------------------- */
 body {
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: #f6f9fb;
+}
+
+/* Reusable brand surfaces -------------------------------------------------- */
+
+/* The signature coastal gradient — used on buttons, accents, hero bands. */
+.brand-gradient {
+  background-image: linear-gradient(120deg, #78d6d0 0%, #55a49d 45%, #1c687d 100%);
+}
+
+/* A deep, moody version for the sidebar and login backdrop. */
+.brand-gradient-deep {
+  background-image: linear-gradient(150deg, #0b1f33 0%, #163f52 45%, #1c687d 100%);
+}
+
+/* Big animated gradient that "reaches across the page" (login backdrop). */
+.brand-gradient-animated {
+  background-image: linear-gradient(120deg, #030b19, #1c687d, #36838c, #55a49d, #78d6d0, #163f52);
+  background-size: 300% 300%;
+  animation: var(--animate-gradient);
+}
+
+/* Display type helper: the Bebas wordmark look. */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+/* Text clipped to the coastal gradient (headings, wordmark). */
+.text-gradient {
+  background-image: linear-gradient(120deg, #78d6d0, #55a49d, #1c687d);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }

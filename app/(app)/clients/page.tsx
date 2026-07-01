@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
+import { buttonClass } from '@/components/ui/button-styles';
 
 export default async function ClientsPage() {
   const supabase = await createClient();
@@ -15,10 +16,7 @@ export default async function ClientsPage() {
         title="Clients"
         description="Your clients and their projects and quotes."
         action={
-          <Link
-            href="/clients/new"
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700"
-          >
+          <Link href="/clients/new" className={buttonClass('primary')}>
             New client
           </Link>
         }
@@ -31,16 +29,16 @@ export default async function ClientsPage() {
       )}
 
       {!error && (!clients || clients.length === 0) && (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 px-6 py-14 text-center">
           <p className="text-sm text-slate-500">No clients yet.</p>
-          <Link href="/clients/new" className="mt-2 inline-block text-sm font-medium text-slate-900 underline">
+          <Link href="/clients/new" className="mt-2 inline-block text-sm font-medium text-sea underline">
             Add your first client
           </Link>
         </div>
       )}
 
       {clients && clients.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">

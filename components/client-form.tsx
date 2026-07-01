@@ -6,7 +6,9 @@
 import Link from 'next/link';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
+import { motion } from 'motion/react';
 import { saveClient, type ClientFormState } from '@/app/(app)/clients/actions';
+import { Button } from '@/components/ui/button';
 import type { Database } from '@/types/database.types';
 
 type Client = Database['public']['Tables']['clients']['Row'];
@@ -16,18 +18,14 @@ const initialState: ClientFormState = { error: null };
 function SaveButton({ editing }: { editing: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:opacity-60"
-    >
+    <Button type="submit" disabled={pending}>
       {pending ? 'Saving…' : editing ? 'Save changes' : 'Create client'}
-    </button>
+    </Button>
   );
 }
 
 const fieldClass =
-  'rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900';
+  'rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-ink outline-none transition-shadow focus:border-teal focus:ring-2 focus:ring-aqua/40';
 
 export function ClientForm({ client }: { client?: Client }) {
   const [state, formAction] = useActionState(saveClient, initialState);
@@ -74,9 +72,14 @@ export function ClientForm({ client }: { client?: Client }) {
       </div>
 
       {state.error && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+        <motion.p
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700"
+          role="alert"
+        >
           {state.error}
-        </p>
+        </motion.p>
       )}
 
       <div className="flex items-center gap-3">

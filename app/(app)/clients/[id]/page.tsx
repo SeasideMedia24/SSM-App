@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
 import { DeleteClientButton } from '@/components/delete-client-button';
+import { buttonClass } from '@/components/ui/button-styles';
 
 // In Next.js 16, `params` and `searchParams` are Promises and must be awaited.
 export default async function ClientDetailPage({
@@ -39,10 +40,7 @@ export default async function ClientDetailPage({
         description={client.company ?? undefined}
         action={
           <div className="flex items-center gap-2">
-            <Link
-              href={`/clients/${client.id}/edit`}
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
-            >
+            <Link href={`/clients/${client.id}/edit`} className={buttonClass('secondary', 'sm')}>
               Edit
             </Link>
             <DeleteClientButton clientId={client.id} clientName={client.name} />
@@ -57,7 +55,7 @@ export default async function ClientDetailPage({
       )}
 
       {/* Contact details */}
-      <div className="mb-8 grid grid-cols-1 gap-4 rounded-lg border border-slate-200 bg-white p-5 sm:grid-cols-2">
+      <div className="mb-8 grid grid-cols-1 gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:grid-cols-2">
         <Detail label="Email" value={client.email} />
         <Detail label="Phone" value={client.phone} />
         <Detail label="Notes" value={client.notes} full />
@@ -113,7 +111,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <section className="mb-8">
       <h2 className="mb-3 text-sm font-semibold text-slate-900">{title}</h2>
-      <div className="rounded-lg border border-slate-200 bg-white px-5 py-3">{children}</div>
+      <div className="rounded-2xl border border-slate-200 bg-white px-6 py-4 shadow-sm">{children}</div>
     </section>
   );
 }
