@@ -5,11 +5,20 @@
 //   npx supabase gen types typescript --project-id <ref> > types/database.types.ts
 // Keep this file and the migrations in sync.
 
-export type ProjectStatus = 'backlog' | 'active' | 'in_review' | 'done' | 'archived';
+export type ProjectStatus =
+  | 'idea_inquiry'
+  | 'scripting_planning'
+  | 'filming'
+  | 'editing'
+  | 'review_revision'
+  | 'scheduled'
+  | 'archived';
 export type ParaCategory = 'project' | 'area' | 'resource' | 'archive';
-export type TaskStatus = 'todo' | 'in_progress' | 'blocked' | 'done';
+export type TaskStatus = 'not_started' | 'in_progress' | 'done';
 export type TaskPriority = 'low' | 'medium' | 'high';
 export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'declined';
+export type ClientType = 'new' | 'inquiry' | 'recurring' | 'retainer' | 'one_off';
+export type ContractStatus = 'draft' | 'sent' | 'signed' | 'declined';
 
 export type Database = {
   public: {
@@ -46,6 +55,7 @@ export type Database = {
           email: string | null;
           phone: string | null;
           notes: string | null;
+          client_type: ClientType;
           created_at: string;
         };
         Insert: {
@@ -55,6 +65,7 @@ export type Database = {
           email?: string | null;
           phone?: string | null;
           notes?: string | null;
+          client_type?: ClientType;
           created_at?: string;
         };
         Update: {
@@ -64,6 +75,7 @@ export type Database = {
           email?: string | null;
           phone?: string | null;
           notes?: string | null;
+          client_type?: ClientType;
           created_at?: string;
         };
         Relationships: [];
@@ -76,6 +88,7 @@ export type Database = {
           description: string | null;
           status: ProjectStatus;
           para_category: ParaCategory;
+          tags: string[];
           start_date: string | null;
           due_date: string | null;
           created_at: string;
@@ -87,6 +100,7 @@ export type Database = {
           description?: string | null;
           status?: ProjectStatus;
           para_category?: ParaCategory;
+          tags?: string[];
           start_date?: string | null;
           due_date?: string | null;
           created_at?: string;
@@ -98,6 +112,7 @@ export type Database = {
           description?: string | null;
           status?: ProjectStatus;
           para_category?: ParaCategory;
+          tags?: string[];
           start_date?: string | null;
           due_date?: string | null;
           created_at?: string;
@@ -273,6 +288,212 @@ export type Database = {
         };
         Relationships: [];
       };
+      deliverables: {
+        Row: {
+          id: string;
+          project_id: string;
+          title: string;
+          description: string | null;
+          status: TaskStatus;
+          due_date: string | null;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          title: string;
+          description?: string | null;
+          status?: TaskStatus;
+          due_date?: string | null;
+          position?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          title?: string;
+          description?: string | null;
+          status?: TaskStatus;
+          due_date?: string | null;
+          position?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'deliverables_project_id_fkey';
+            columns: ['project_id'];
+            referencedRelation: 'projects';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      contracts: {
+        Row: {
+          id: string;
+          project_id: string;
+          title: string;
+          status: ContractStatus;
+          amount: number | null;
+          signed_date: string | null;
+          file_url: string | null;
+          notes: string | null;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          title: string;
+          status?: ContractStatus;
+          amount?: number | null;
+          signed_date?: string | null;
+          file_url?: string | null;
+          notes?: string | null;
+          position?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          title?: string;
+          status?: ContractStatus;
+          amount?: number | null;
+          signed_date?: string | null;
+          file_url?: string | null;
+          notes?: string | null;
+          position?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'contracts_project_id_fkey';
+            columns: ['project_id'];
+            referencedRelation: 'projects';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      expenses: {
+        Row: {
+          id: string;
+          project_id: string;
+          label: string;
+          category: string | null;
+          amount: number;
+          spent_on: string | null;
+          notes: string | null;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          label: string;
+          category?: string | null;
+          amount?: number;
+          spent_on?: string | null;
+          notes?: string | null;
+          position?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          label?: string;
+          category?: string | null;
+          amount?: number;
+          spent_on?: string | null;
+          notes?: string | null;
+          position?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'expenses_project_id_fkey';
+            columns: ['project_id'];
+            referencedRelation: 'projects';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      budget_lines: {
+        Row: {
+          id: string;
+          project_id: string;
+          label: string;
+          planned_amount: number;
+          actual_amount: number;
+          notes: string | null;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          label: string;
+          planned_amount?: number;
+          actual_amount?: number;
+          notes?: string | null;
+          position?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          label?: string;
+          planned_amount?: number;
+          actual_amount?: number;
+          notes?: string | null;
+          position?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'budget_lines_project_id_fkey';
+            columns: ['project_id'];
+            referencedRelation: 'projects';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      milestones: {
+        Row: {
+          id: string;
+          project_id: string;
+          title: string;
+          date: string | null;
+          status: TaskStatus;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          title: string;
+          date?: string | null;
+          status?: TaskStatus;
+          position?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          title?: string;
+          date?: string | null;
+          status?: TaskStatus;
+          position?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'milestones_project_id_fkey';
+            columns: ['project_id'];
+            referencedRelation: 'projects';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -282,6 +503,8 @@ export type Database = {
       task_status: TaskStatus;
       task_priority: TaskPriority;
       quote_status: QuoteStatus;
+      client_type: ClientType;
+      contract_status: ContractStatus;
     };
     CompositeTypes: Record<string, never>;
   };
