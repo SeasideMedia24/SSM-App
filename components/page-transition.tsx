@@ -22,6 +22,8 @@ const EASE = [0.76, 0, 0.24, 1] as const;
 export function PageTransition({ children }: { children: React.ReactNode }) {
   const [done, setDone] = useState(false);
 
+  // Overlays are `absolute`, so they cover only the white content area (their
+  // positioned ancestor is <main>) — the sidebar stays put during transitions.
   return (
     <>
       <motion.div
@@ -38,7 +40,7 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
 
 function Overlay({ effect, onDone }: { effect: Effect; onDone: () => void }) {
   const panel =
-    'brand-gradient-deep pointer-events-none fixed inset-0 z-50 will-change-transform';
+    'brand-gradient-deep pointer-events-none absolute inset-0 z-50 will-change-transform';
 
   if (effect === 'dissolve') {
     return (
@@ -82,7 +84,7 @@ function Overlay({ effect, onDone }: { effect: Effect; onDone: () => void }) {
     return (
       <>
         <motion.div
-          className="brand-gradient-deep pointer-events-none fixed inset-x-0 top-0 z-50 h-1/2 will-change-transform"
+          className="brand-gradient-deep pointer-events-none absolute inset-x-0 top-0 z-50 h-1/2 will-change-transform"
           initial={{ y: '0%' }}
           animate={{ y: '-100%' }}
           transition={{ duration: 0.6, ease: EASE }}
@@ -90,7 +92,7 @@ function Overlay({ effect, onDone }: { effect: Effect; onDone: () => void }) {
           <Edge side="bottom" />
         </motion.div>
         <motion.div
-          className="brand-gradient-deep pointer-events-none fixed inset-x-0 bottom-0 z-50 h-1/2 will-change-transform"
+          className="brand-gradient-deep pointer-events-none absolute inset-x-0 bottom-0 z-50 h-1/2 will-change-transform"
           initial={{ y: '0%' }}
           animate={{ y: '100%' }}
           transition={{ duration: 0.6, ease: EASE }}
