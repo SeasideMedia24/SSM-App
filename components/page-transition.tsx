@@ -1,34 +1,25 @@
 'use client';
 
-// Cinematic tab-to-tab transitions. On every navigation the (app) template
+// Cinematic tab-to-tab transition. On every navigation the (app) template
 // re-mounts, which re-runs this component and plays a full-screen coastal
-// transition, then the page content rises into focus.
+// "dissolve", then the page content rises into focus.
 //
-// Several distinct effects rotate by route so switching tabs never feels
-// repetitive: wipe, dissolve, iris (circle reveal), split (barn doors), curtain.
+// All tabs use the same effect (dissolve) by request. The Overlay below still
+// supports wipe / iris / split / curtain — to rotate per tab again, pick an
+// effect from the pathname and pass it in.
 //
-// All overlays are pointer-events-none and unmount once finished, so they never
-// block interaction. Transforms/opacity/clip-path keep it GPU-friendly.
+// Overlays are pointer-events-none and unmount once finished, so they never
+// block interaction. Opacity/transform/clip-path keep it GPU-friendly.
 
-import { useMemo, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 import { motion } from 'motion/react';
 
-const EFFECTS = ['wipe', 'iris', 'split', 'curtain', 'dissolve'] as const;
-type Effect = (typeof EFFECTS)[number];
+type Effect = 'wipe' | 'iris' | 'split' | 'curtain' | 'dissolve';
 
-// Deterministic pick per path (stable across SSR/hydration; different per tab).
-function effectForPath(path: string): Effect {
-  let h = 0;
-  for (let i = 0; i < path.length; i++) h = (h * 31 + path.charCodeAt(i)) >>> 0;
-  return EFFECTS[h % EFFECTS.length];
-}
-
-const EASE = [0.76, 0, 0.24, 1] as const; // strong easeInOut for a snappy sweep
+const EFFECT: Effect = 'dissolve';
+const EASE = [0.76, 0, 0.24, 1] as const;
 
 export function PageTransition({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const effect = useMemo(() => effectForPath(pathname), [pathname]);
   const [done, setDone] = useState(false);
 
   return (
@@ -36,11 +27,11 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
       <motion.div
         initial={{ opacity: 0, y: 16, filter: 'blur(10px)' }}
         animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-        transition={{ duration: 0.55, delay: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: 0.5, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
       >
         {children}
       </motion.div>
-      {!done && <Overlay effect={effect} onDone={() => setDone(true)} />}
+      {!done && <Overlay effect={EFFECT} onDone={() => setDone(true)} />}
     </>
   );
 }
@@ -55,14 +46,13 @@ function Overlay({ effect, onDone }: { effect: Effect; onDone: () => void }) {
         className={panel}
         initial={{ opacity: 1 }}
         animate={{ opacity: 0 }}
-        transition={{ duration: 0.6, ease: 'easeInOut' }}
+        transition={{ duration: 0.55, ease: 'easeInOut' }}
         onAnimationComplete={onDone}
       />
     );
   }
 
   if (effect === 'iris') {
-    // The overlay shrinks to a point at the centre, revealing the page.
     return (
       <motion.div
         className={panel}
@@ -75,7 +65,6 @@ function Overlay({ effect, onDone }: { effect: Effect; onDone: () => void }) {
   }
 
   if (effect === 'curtain') {
-    // Rises up off the screen like a theatre curtain.
     return (
       <motion.div
         className={panel}
@@ -90,7 +79,6 @@ function Overlay({ effect, onDone }: { effect: Effect; onDone: () => void }) {
   }
 
   if (effect === 'split') {
-    // Two panels part vertically (barn doors) to reveal the page.
     return (
       <>
         <motion.div
@@ -114,7 +102,6 @@ function Overlay({ effect, onDone }: { effect: Effect; onDone: () => void }) {
     );
   }
 
-  // wipe — sweeps off to the right, revealing the page left-to-right.
   return (
     <motion.div
       className={panel}
@@ -128,7 +115,6 @@ function Overlay({ effect, onDone }: { effect: Effect; onDone: () => void }) {
   );
 }
 
-// A bright aqua leading edge that gives the sweeping panels a sense of speed.
 function Edge({ side }: { side: 'right' | 'bottom' | 'top' }) {
   const map = {
     right: 'inset-y-0 right-0 w-1.5 bg-gradient-to-b',
