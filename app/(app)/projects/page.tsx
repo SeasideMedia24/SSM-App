@@ -17,11 +17,12 @@ function clientName(c: ClientRel): string | null {
 export default async function ProjectsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; para?: string }>;
+  searchParams: Promise<{ view?: string; para?: string; tags?: string }>;
 }) {
   const sp = await searchParams;
   const view = sp.view === 'list' ? 'list' : 'board';
   const para = sp.para ?? '';
+  const tagFilter = (sp.tags ?? '').split(',').map((t) => t.trim()).filter(Boolean);
 
   const supabase = await createClient();
   let query = supabase
@@ -32,7 +33,7 @@ export default async function ProjectsPage({
 
   const { data, error } = await query;
 
-  const projects: (BoardProject & { para_category: ParaCategory })[] = (data ?? []).map((p) => ({
+  const allProjects: (BoardProject & { para_category: ParaCategory })[] = (data ?? []).map((p) => ({
     id: p.id,
     title: p.title,
     status: p.status as ProjectStatus,
@@ -41,6 +42,11 @@ export default async function ProjectsPage({
     para_category: p.para_category as ParaCategory,
     clientName: clientName(p.clients as ClientRel),
   }));
+
+  // Tag filter (stackable): show projects that have any of the selected tags.
+  const projects = tagFilter.length
+    ? allProjects.filter((p) => p.tags.some((t) => tagFilter.includes(t)))
+    : allProjects;
 
   return (
     <>
@@ -54,7 +60,7 @@ export default async function ProjectsPage({
         }
       />
 
-      <ProjectsToolbar view={view} para={para} />
+      <ProjectsToolbar view={view} para={para} tags={tagFilter} />
 
       {error && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -62,7 +68,13 @@ export default async function ProjectsPage({
         </p>
       )}
 
-      {!error && projects.length === 0 && (
+      {!error && projects.length === 0 && allProjects.length > 0 && (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 px-6 py-14 text-center">
+          <p className="text-sm text-slate-500">No projects match these tags.</p>
+        </div>
+      )}
+
+      {!error && allProjects.length === 0 && (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 px-6 py-14 text-center">
           <p className="text-sm text-slate-500">No projects yet.</p>
           <Link href="/projects/new" className="mt-2 inline-block text-sm font-medium text-sea underline">

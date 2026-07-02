@@ -9,8 +9,13 @@ import { revalidatePath } from 'next/cache';
 import { createClient as createSupabaseServer } from '@/lib/supabase/server';
 import { projectSchema, parseTags, emptyDateToNull } from '@/lib/validation/project';
 import { templateRows } from '@/lib/projects/template';
+import { cleanTags } from '@/lib/projects/tags';
 import type { ProjectStatus } from '@/types/database.types';
 import { PROJECT_STATUS_VALUES } from '@/lib/validation/project';
+
+// When a client reaches this many projects, auto-upgrade them to "recurring"
+// (only if they're still marked new/inquiry — never overrides a manual choice).
+const RECURRING_THRESHOLD = 2;
 
 export type ProjectFormState = { error: string | null };
 
@@ -35,13 +40,14 @@ export async function saveProject(
     return { error: parsed.error.issues[0]?.message ?? 'Please check the form and try again.' };
   }
 
+  // Only store tags that are in the allowed taxonomy (see lib/projects/tags.ts).
   const values = {
     title: parsed.data.title.trim(),
     client_id: parsed.data.client_id,
     description: parsed.data.description?.trim() || null,
     status: parsed.data.status ?? 'idea_inquiry',
     para_category: parsed.data.para_category ?? 'project',
-    tags: parseTags(parsed.data.tags),
+    tags: cleanTags(parseTags(parsed.data.tags)),
     start_date: emptyDateToNull(parsed.data.start_date),
     due_date: emptyDateToNull(parsed.data.due_date),
   };
@@ -57,17 +63,39 @@ export async function saveProject(
     if (error || !data) return { error: 'Could not create the project. Please try again.' };
     savedId = data.id;
 
-    // Seed the template rows for the new project (best-effort).
-    const rows = templateRows(savedId);
+    // Seed the template rows for the new project, matched to the chosen type.
+    const projectType = String(formData.get('project_type') ?? '') || undefined;
+    const rows = templateRows(savedId, projectType);
     await Promise.all([
       supabase.from('deliverables').insert(rows.deliverables),
       supabase.from('milestones').insert(rows.milestones),
       supabase.from('budget_lines').insert(rows.budget_lines),
     ]);
+
+    // Automation: auto-upgrade the client to "recurring" once they cross the
+    // threshold (non-destructive — only when still new/inquiry).
+    await maybeUpgradeClient(supabase, values.client_id);
   }
 
   revalidatePath('/projects');
   redirect(`/projects/${savedId}`);
+}
+
+type ServerSupabase = Awaited<ReturnType<typeof createSupabaseServer>>;
+
+async function maybeUpgradeClient(supabase: ServerSupabase, clientId: string) {
+  const [{ count }, { data: client }] = await Promise.all([
+    supabase.from('projects').select('id', { count: 'exact', head: true }).eq('client_id', clientId),
+    supabase.from('clients').select('client_type').eq('id', clientId).single(),
+  ]);
+  if (
+    (count ?? 0) >= RECURRING_THRESHOLD &&
+    client &&
+    (client.client_type === 'new' || client.client_type === 'inquiry')
+  ) {
+    await supabase.from('clients').update({ client_type: 'recurring' }).eq('id', clientId);
+    revalidatePath('/clients');
+  }
 }
 
 // Called from the kanban when a card is dragged to a new column.

@@ -1,47 +1,57 @@
 // The "project template" — the default deliverables, milestones, and budget
-// lines that autofill every new project (mirrors Notion's default Project
-// Template). Edit these lists to change what a fresh project starts with.
+// lines that autofill a new project (mirrors Notion's default Project Template).
 //
-// (In a later phase these become editable in Settings.)
+// Now type-aware: picking a project type on create seeds a matching set. Edit
+// these lists to change what each type of project starts with. (Later these
+// become editable in Settings.)
 
-export const TEMPLATE_DELIVERABLES: { title: string }[] = [
-  { title: 'Final video' },
-  { title: 'Social cutdowns' },
-  { title: 'Raw footage' },
-  { title: 'Thumbnail' },
+export type ProjectType = 'brand_film' | 'social' | 'event' | 'commercial' | 'retainer';
+
+export const PROJECT_TYPES: { value: ProjectType; label: string }[] = [
+  { value: 'brand_film', label: 'Brand Film' },
+  { value: 'social', label: 'Social Package' },
+  { value: 'event', label: 'Event Coverage' },
+  { value: 'commercial', label: 'Commercial' },
+  { value: 'retainer', label: 'Retainer' },
 ];
 
-export const TEMPLATE_MILESTONES: { title: string }[] = [
-  { title: 'Kickoff' },
-  { title: 'Filming day' },
-  { title: 'First cut' },
-  { title: 'Delivery' },
-];
+type Template = { deliverables: string[]; milestones: string[]; budget: string[] };
 
-export const TEMPLATE_BUDGET_LINES: { label: string }[] = [
-  { label: 'Production' },
-  { label: 'Editing' },
-  { label: 'Travel' },
-  { label: 'Gear / rentals' },
-];
+const TEMPLATES: Record<ProjectType, Template> = {
+  brand_film: {
+    deliverables: ['Final video', 'Social cutdowns', 'Raw footage', 'Thumbnail'],
+    milestones: ['Kickoff', 'Filming day', 'First cut', 'Delivery'],
+    budget: ['Production', 'Editing', 'Travel', 'Gear / rentals'],
+  },
+  social: {
+    deliverables: ['Reel 1', 'Reel 2', 'Reel 3', 'Caption pack'],
+    milestones: ['Content plan', 'Shoot day', 'Drafts', 'Delivery'],
+    budget: ['Production', 'Editing', 'Music / licensing'],
+  },
+  event: {
+    deliverables: ['Highlight film', 'Full-length edit', 'Photo gallery'],
+    milestones: ['Pre-event call', 'Event day', 'First cut', 'Delivery'],
+    budget: ['Crew', 'Gear / rentals', 'Travel'],
+  },
+  commercial: {
+    deliverables: ['Hero spot', '15s cutdown', '6s bumper', 'Raw footage'],
+    milestones: ['Creative / storyboard', 'Pre-production', 'Shoot day', 'Post', 'Delivery'],
+    budget: ['Pre-production', 'Production', 'Post-production', 'Talent', 'Gear / rentals'],
+  },
+  retainer: {
+    deliverables: ['Monthly video 1', 'Monthly video 2', 'Social cutdowns'],
+    milestones: ['Monthly planning', 'Shoot day', 'Delivery'],
+    budget: ['Production', 'Editing'],
+  },
+};
 
-// Build the rows to insert for a newly-created project.
-export function templateRows(projectId: string) {
+// Build the rows to insert for a newly-created project of the given type.
+export function templateRows(projectId: string, type?: string) {
+  const key = (type && type in TEMPLATES ? type : 'brand_film') as ProjectType;
+  const tpl = TEMPLATES[key];
   return {
-    deliverables: TEMPLATE_DELIVERABLES.map((d, i) => ({
-      project_id: projectId,
-      title: d.title,
-      position: i,
-    })),
-    milestones: TEMPLATE_MILESTONES.map((m, i) => ({
-      project_id: projectId,
-      title: m.title,
-      position: i,
-    })),
-    budget_lines: TEMPLATE_BUDGET_LINES.map((b, i) => ({
-      project_id: projectId,
-      label: b.label,
-      position: i,
-    })),
+    deliverables: tpl.deliverables.map((title, i) => ({ project_id: projectId, title, position: i })),
+    milestones: tpl.milestones.map((title, i) => ({ project_id: projectId, title, position: i })),
+    budget_lines: tpl.budget.map((label, i) => ({ project_id: projectId, label, position: i })),
   };
 }

@@ -4,12 +4,14 @@
 // it undefined to create (which also seeds the template — see actions.ts).
 
 import Link from 'next/link';
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { motion } from 'motion/react';
 import { saveProject, type ProjectFormState } from '@/app/(app)/projects/actions';
 import { Button } from '@/components/ui/button';
 import { PROJECT_STATUSES } from '@/lib/projects/status';
+import { PROJECT_TAGS } from '@/lib/projects/tags';
+import { PROJECT_TYPES } from '@/lib/projects/template';
 import type { Database } from '@/types/database.types';
 
 type Project = Database['public']['Tables']['projects']['Row'];
@@ -113,17 +115,24 @@ export function ProjectForm({
         </div>
       </div>
 
+      {!editing && (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="project_type" className="text-sm font-medium text-slate-700">
+            Project type <span className="text-slate-400">(seeds the template)</span>
+          </label>
+          <select id="project_type" name="project_type" defaultValue="brand_film" className={field}>
+            {PROJECT_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="tags" className="text-sm font-medium text-slate-700">
-          Tags <span className="text-slate-400">(comma-separated)</span>
-        </label>
-        <input
-          id="tags"
-          name="tags"
-          defaultValue={project?.tags?.join(', ') ?? ''}
-          placeholder="brand film, q3, priority"
-          className={field}
-        />
+        <span className="text-sm font-medium text-slate-700">Tags</span>
+        <TagPicker initial={project?.tags ?? []} />
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -151,5 +160,41 @@ export function ProjectForm({
         </Link>
       </div>
     </form>
+  );
+}
+
+// Click-to-stack tag picker. Submits the selected tags as a single hidden
+// comma-separated field named "tags" (the server action splits + validates it).
+function TagPicker({ initial }: { initial: string[] }) {
+  const [selected, setSelected] = useState<string[]>(() => initial.filter((t) => PROJECT_TAGS.includes(t)));
+
+  function toggle(tag: string) {
+    setSelected((cur) => (cur.includes(tag) ? cur.filter((t) => t !== tag) : [...cur, tag]));
+  }
+
+  return (
+    <div>
+      <input type="hidden" name="tags" value={selected.join(',')} />
+      <div className="flex flex-wrap gap-2">
+        {PROJECT_TAGS.map((tag) => {
+          const on = selected.includes(tag);
+          return (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => toggle(tag)}
+              aria-pressed={on}
+              className={`rounded-full border px-3 py-1 text-sm transition-colors ${
+                on
+                  ? 'border-teal bg-teal/10 text-sea'
+                  : 'border-slate-200 bg-white text-slate-500 hover:border-teal/60 hover:text-slate-700'
+              }`}
+            >
+              {tag}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }

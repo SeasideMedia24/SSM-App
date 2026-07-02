@@ -4,7 +4,7 @@
 //
 // (Tailwind classes are written out in full so the compiler keeps them.)
 
-import type { ProjectStatus, TaskStatus, TaskPriority, ClientType } from '@/types/database.types';
+import type { ProjectStatus, TaskStatus, TaskPriority, ClientType, ContractStatus } from '@/types/database.types';
 
 export type StatusMeta<T extends string> = {
   value: T;
@@ -37,6 +37,13 @@ export const TASK_PRIORITIES: { value: TaskPriority; label: string; pill: string
   { value: 'high', label: 'High', pill: 'bg-rose-100 text-rose-700' },
 ];
 
+export const CONTRACT_STATUSES: { value: ContractStatus; label: string; pill: string }[] = [
+  { value: 'draft', label: 'Draft', pill: 'bg-slate-100 text-slate-600' },
+  { value: 'sent', label: 'Sent', pill: 'bg-blue-100 text-blue-700' },
+  { value: 'signed', label: 'Signed', pill: 'bg-green-100 text-green-700' },
+  { value: 'declined', label: 'Declined', pill: 'bg-red-100 text-red-700' },
+];
+
 export const CLIENT_TYPES: { value: ClientType; label: string; pill: string }[] = [
   { value: 'new', label: 'New', pill: 'bg-yellow-100 text-yellow-800' },
   { value: 'inquiry', label: 'Inquiry', pill: 'bg-purple-100 text-purple-700' },
@@ -50,8 +57,10 @@ const projectMap = new Map(PROJECT_STATUSES.map((s) => [s.value, s]));
 const taskMap = new Map(TASK_STATUSES.map((s) => [s.value, s]));
 const priorityMap = new Map(TASK_PRIORITIES.map((s) => [s.value, s]));
 const clientTypeMap = new Map(CLIENT_TYPES.map((s) => [s.value, s]));
+const contractMap = new Map(CONTRACT_STATUSES.map((s) => [s.value, s]));
 
 export const projectStatusMeta = (v: ProjectStatus) => projectMap.get(v)!;
 export const taskStatusMeta = (v: TaskStatus) => taskMap.get(v)!;
 export const taskPriorityMeta = (v: TaskPriority) => priorityMap.get(v)!;
 export const clientTypeMeta = (v: ClientType) => clientTypeMap.get(v)!;
+export const contractStatusMeta = (v: ContractStatus) => contractMap.get(v)!;
