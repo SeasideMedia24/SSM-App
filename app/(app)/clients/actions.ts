@@ -24,6 +24,7 @@ export async function saveClient(
     email: formData.get('email'),
     phone: formData.get('phone'),
     notes: formData.get('notes'),
+    client_type: formData.get('client_type') || undefined,
   });
 
   if (!parsed.success) {
@@ -37,6 +38,7 @@ export async function saveClient(
     email: emptyToNull(parsed.data.email),
     phone: emptyToNull(parsed.data.phone),
     notes: emptyToNull(parsed.data.notes),
+    client_type: parsed.data.client_type ?? 'one_time',
   };
 
   const supabase = await createSupabaseServer();

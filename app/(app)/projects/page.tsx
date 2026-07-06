@@ -4,49 +4,61 @@ import { PageHeader } from '@/components/page-header';
 import { buttonClass } from '@/components/ui/button-styles';
 import { ProjectsToolbar } from '@/components/projects/toolbar';
 import { ProjectBoard } from '@/components/projects/board';
-import { projectStatusMeta } from '@/lib/projects/status';
+import { projectStatusMeta, taskPriorityMeta } from '@/lib/projects/status';
+import { projectTypeLabel } from '@/lib/projects/template';
+import { compareProjects } from '@/lib/projects/sort';
 import type { BoardProject } from '@/components/projects/project-card';
-import type { ProjectStatus, ParaCategory } from '@/types/database.types';
+import type { ProjectStatus, TaskPriority, ClientType } from '@/types/database.types';
 
-type ClientRel = { name: string } | { name: string }[] | null;
-function clientName(c: ClientRel): string | null {
+type ClientRel = { name: string; client_type: ClientType } | { name: string; client_type: ClientType }[] | null;
+function clientOf(c: ClientRel): { name: string; client_type: ClientType } | null {
   if (!c) return null;
-  return Array.isArray(c) ? (c[0]?.name ?? null) : c.name;
+  return Array.isArray(c) ? (c[0] ?? null) : c;
 }
 
 export default async function ProjectsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; para?: string; tags?: string }>;
+  searchParams: Promise<{ view?: string; ptype?: string; ctype?: string }>;
 }) {
   const sp = await searchParams;
   const view = sp.view === 'list' ? 'list' : 'board';
-  const para = sp.para ?? '';
-  const tagFilter = (sp.tags ?? '').split(',').map((t) => t.trim()).filter(Boolean);
+  const ptype = sp.ptype ?? '';
+  const ctype = sp.ctype ?? '';
 
   const supabase = await createClient();
-  let query = supabase
+  const { data, error } = await supabase
     .from('projects')
-    .select('id, title, status, tags, due_date, para_category, clients(name)')
+    .select('id, title, status, priority, project_type, due_date, clients(name, client_type)')
     .order('created_at', { ascending: false });
-  if (para) query = query.eq('para_category', para as ParaCategory);
 
-  const { data, error } = await query;
+  const mapped = (data ?? []).map((p) => {
+    const cl = clientOf(p.clients as ClientRel);
+    return {
+      id: p.id,
+      title: p.title,
+      status: p.status as ProjectStatus,
+      priority: p.priority as TaskPriority,
+      project_type: p.project_type,
+      due_date: p.due_date,
+      clientName: cl?.name ?? null,
+      clientType: cl?.client_type ?? null,
+    };
+  });
 
-  const allProjects: (BoardProject & { para_category: ParaCategory })[] = (data ?? []).map((p) => ({
+  // Filter by project type + client type (both from the URL).
+  const filtered = mapped.filter(
+    (p) => (!ptype || p.project_type === ptype) && (!ctype || p.clientType === ctype),
+  );
+  const projects: BoardProject[] = filtered.map((p) => ({
     id: p.id,
     title: p.title,
-    status: p.status as ProjectStatus,
-    tags: p.tags ?? [],
+    status: p.status,
+    priority: p.priority,
+    project_type: p.project_type,
     due_date: p.due_date,
-    para_category: p.para_category as ParaCategory,
-    clientName: clientName(p.clients as ClientRel),
+    clientName: p.clientName,
   }));
-
-  // Tag filter (stackable): show projects that have any of the selected tags.
-  const projects = tagFilter.length
-    ? allProjects.filter((p) => p.tags.some((t) => tagFilter.includes(t)))
-    : allProjects;
 
   return (
     <>
@@ -60,7 +72,7 @@ export default async function ProjectsPage({
         }
       />
 
-      <ProjectsToolbar view={view} para={para} tags={tagFilter} />
+      <ProjectsToolbar view={view} ptype={ptype} ctype={ctype} />
 
       {error && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -68,13 +80,13 @@ export default async function ProjectsPage({
         </p>
       )}
 
-      {!error && projects.length === 0 && allProjects.length > 0 && (
+      {!error && projects.length === 0 && mapped.length > 0 && (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 px-6 py-14 text-center">
-          <p className="text-sm text-slate-500">No projects match these tags.</p>
+          <p className="text-sm text-slate-500">No projects match these filters.</p>
         </div>
       )}
 
-      {!error && allProjects.length === 0 && (
+      {!error && mapped.length === 0 && (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 px-6 py-14 text-center">
           <p className="text-sm text-slate-500">No projects yet.</p>
           <Link href="/projects/new" className="mt-2 inline-block text-sm font-medium text-sea underline">
@@ -92,13 +104,15 @@ export default async function ProjectsPage({
               <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-4 py-3 font-medium">Project</th>
                 <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Type</th>
                 <th className="px-4 py-3 font-medium">Client</th>
-                <th className="px-4 py-3 font-medium">Category</th>
+                <th className="px-4 py-3 font-medium">Priority</th>
               </tr>
             </thead>
             <tbody>
-              {projects.map((p) => {
+              {[...projects].sort(compareProjects).map((p) => {
                 const meta = projectStatusMeta(p.status);
+                const prio = taskPriorityMeta(p.priority);
                 return (
                   <tr key={p.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                     <td className="px-4 py-3">
@@ -109,8 +123,11 @@ export default async function ProjectsPage({
                     <td className="px-4 py-3">
                       <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${meta.pill}`}>{meta.label}</span>
                     </td>
+                    <td className="px-4 py-3 text-slate-600">{projectTypeLabel(p.project_type) ?? '—'}</td>
                     <td className="px-4 py-3 text-slate-600">{p.clientName ?? '—'}</td>
-                    <td className="px-4 py-3 capitalize text-slate-600">{p.para_category}</td>
+                    <td className="px-4 py-3">
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] ${prio.pill}`}>{prio.label}</span>
+                    </td>
                   </tr>
                 );
               })}

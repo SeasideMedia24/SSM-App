@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
 import { DeleteClientButton } from '@/components/delete-client-button';
 import { buttonClass } from '@/components/ui/button-styles';
+import { clientTypeMeta } from '@/lib/projects/status';
 
 // In Next.js 16, `params` and `searchParams` are Promises and must be awaited.
 export default async function ClientDetailPage({
@@ -47,6 +48,12 @@ export default async function ClientDetailPage({
           </div>
         }
       />
+
+      <div className="-mt-3 mb-6">
+        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${clientTypeMeta(client.client_type).pill}`}>
+          {clientTypeMeta(client.client_type).label}
+        </span>
+      </div>
 
       {errorFlag === 'delete' && (
         <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">

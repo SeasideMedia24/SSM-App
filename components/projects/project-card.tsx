@@ -6,15 +6,17 @@
 
 import { useRouter } from 'next/navigation';
 import { useDraggable } from '@dnd-kit/core';
-import { projectStatusMeta } from '@/lib/projects/status';
-import type { ProjectStatus } from '@/types/database.types';
+import { projectStatusMeta, taskPriorityMeta } from '@/lib/projects/status';
+import { projectTypeLabel } from '@/lib/projects/template';
+import type { ProjectStatus, TaskPriority } from '@/types/database.types';
 
 export type BoardProject = {
   id: string;
   title: string;
   status: ProjectStatus;
+  priority: TaskPriority;
+  project_type: string | null;
   clientName: string | null;
-  tags: string[];
   due_date: string | null;
 };
 
@@ -23,9 +25,17 @@ function formatDue(date: string | null) {
   return new Date(date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+// A small colored dot showing priority (High = rose, Medium = sky, Low = slate).
+function PriorityDot({ priority }: { priority: TaskPriority }) {
+  const color = priority === 'high' ? 'bg-rose-500' : priority === 'medium' ? 'bg-sky-500' : 'bg-slate-300';
+  const label = `${taskPriorityMeta(priority).label} priority`;
+  return <span className={`mt-1 inline-block h-2 w-2 shrink-0 rounded-full ${color}`} title={label} aria-label={label} />;
+}
+
 export function CardBody({ project, dragging }: { project: BoardProject; dragging?: boolean }) {
   const meta = projectStatusMeta(project.status);
   const due = formatDue(project.due_date);
+  const typeLabel = projectTypeLabel(project.project_type);
   return (
     <div
       className={`relative rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-all ${
@@ -34,18 +44,17 @@ export function CardBody({ project, dragging }: { project: BoardProject; draggin
     >
       <span className={`absolute inset-y-2 left-0 w-1 rounded-full ${meta.bar}`} aria-hidden="true" />
       <div className="pl-2">
-        <p className="line-clamp-2 text-sm font-medium text-ink">{project.title}</p>
-        {project.clientName && <p className="mt-0.5 text-xs text-slate-500">{project.clientName}</p>}
-        {(project.tags.length > 0 || due) && (
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {project.tags.slice(0, 3).map((t) => (
-              <span key={t} className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
-                {t}
-              </span>
-            ))}
-            {due && (
-              <span className="ml-auto text-[11px] font-medium text-slate-400">{due}</span>
+        <div className="flex items-start gap-2">
+          <PriorityDot priority={project.priority} />
+          <p className="line-clamp-2 text-sm font-medium text-ink">{project.title}</p>
+        </div>
+        {project.clientName && <p className="mt-0.5 pl-4 text-xs text-slate-500">{project.clientName}</p>}
+        {(typeLabel || due) && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-4">
+            {typeLabel && (
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{typeLabel}</span>
             )}
+            {due && <span className="ml-auto text-[11px] font-medium text-slate-400">{due}</span>}
           </div>
         )}
       </div>

@@ -45,11 +45,9 @@ export const CONTRACT_STATUSES: { value: ContractStatus; label: string; pill: st
 ];
 
 export const CLIENT_TYPES: { value: ClientType; label: string; pill: string }[] = [
-  { value: 'new', label: 'New', pill: 'bg-yellow-100 text-yellow-800' },
-  { value: 'inquiry', label: 'Inquiry', pill: 'bg-purple-100 text-purple-700' },
   { value: 'recurring', label: 'Recurring', pill: 'bg-green-100 text-green-700' },
-  { value: 'retainer', label: 'Retainer', pill: 'bg-teal-100 text-teal-700' },
-  { value: 'one_off', label: 'One-off', pill: 'bg-slate-100 text-slate-600' },
+  { value: 'one_time', label: 'One-time', pill: 'bg-slate-100 text-slate-600' },
+  { value: 'campaign', label: 'Campaign', pill: 'bg-purple-100 text-purple-700' },
 ];
 
 // Lookup helpers -------------------------------------------------------------

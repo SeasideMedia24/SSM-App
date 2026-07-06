@@ -17,7 +17,7 @@ export type ParaCategory = 'project' | 'area' | 'resource' | 'archive';
 export type TaskStatus = 'not_started' | 'in_progress' | 'done';
 export type TaskPriority = 'low' | 'medium' | 'high';
 export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'declined';
-export type ClientType = 'new' | 'inquiry' | 'recurring' | 'retainer' | 'one_off';
+export type ClientType = 'recurring' | 'one_time' | 'campaign';
 export type ContractStatus = 'draft' | 'sent' | 'signed' | 'declined';
 
 export type Database = {
@@ -88,6 +88,8 @@ export type Database = {
           description: string | null;
           status: ProjectStatus;
           para_category: ParaCategory;
+          priority: TaskPriority;
+          project_type: string | null;
           tags: string[];
           start_date: string | null;
           due_date: string | null;
@@ -100,6 +102,8 @@ export type Database = {
           description?: string | null;
           status?: ProjectStatus;
           para_category?: ParaCategory;
+          priority?: TaskPriority;
+          project_type?: string | null;
           tags?: string[];
           start_date?: string | null;
           due_date?: string | null;
@@ -112,6 +116,8 @@ export type Database = {
           description?: string | null;
           status?: ProjectStatus;
           para_category?: ParaCategory;
+          priority?: TaskPriority;
+          project_type?: string | null;
           tags?: string[];
           start_date?: string | null;
           due_date?: string | null;

@@ -9,7 +9,10 @@ import { TasksPanel } from '@/components/projects/tasks-panel';
 import {
   DeliverablesPanel, ContractsPanel, ExpensesPanel, BudgetPanel, TimelinePanel,
 } from '@/components/projects/panels';
+import { ProjectPriorityControl } from '@/components/projects/priority-picker';
+import { ArchiveControl } from '@/components/projects/archive-control';
 import { projectStatusMeta } from '@/lib/projects/status';
+import { projectTypeLabel } from '@/lib/projects/template';
 
 type ClientRel = { id: string; name: string } | { id: string; name: string }[] | null;
 function client(c: ClientRel): { id: string; name: string } | null {
@@ -77,20 +80,29 @@ export default async function ProjectDetailPage({
         }
       />
 
-      <div className="-mt-3 mb-6 flex flex-wrap items-center gap-3 text-sm">
+      <div className="-mt-3 mb-5 flex flex-wrap items-center gap-3 text-sm">
         <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${meta.pill}`}>{meta.label}</span>
         {cl && <Link href={`/clients/${cl.id}`} className="text-slate-600 hover:text-sea hover:underline">{cl.name}</Link>}
+        {projectTypeLabel(project.project_type) && (
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{projectTypeLabel(project.project_type)}</span>
+        )}
         {(fmt(project.start_date) || fmt(project.due_date)) && (
           <span className="text-slate-400">{fmt(project.start_date) ?? '—'} → {fmt(project.due_date) ?? '—'}</span>
         )}
-        {project.tags?.map((t: string) => (
-          <span key={t} className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{t}</span>
-        ))}
       </div>
 
       {errorFlag === 'delete' && (
         <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">Couldn’t delete this project. Please try again.</p>
       )}
+
+      {/* Priority + archive controls */}
+      <div className="mb-6 flex flex-wrap items-center gap-5">
+        <div className="flex items-center gap-2">
+          <span className="text-xs uppercase tracking-wide text-slate-400">Priority</span>
+          <ProjectPriorityControl projectId={project.id} value={project.priority} />
+        </div>
+        <ArchiveControl projectId={project.id} archived={project.status === 'archived'} />
+      </div>
 
       <ViewSwitcher active={view} />
 

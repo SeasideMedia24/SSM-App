@@ -4,24 +4,17 @@
 // it undefined to create (which also seeds the template — see actions.ts).
 
 import Link from 'next/link';
-import { useActionState, useState } from 'react';
+import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { motion } from 'motion/react';
 import { saveProject, type ProjectFormState } from '@/app/(app)/projects/actions';
 import { Button } from '@/components/ui/button';
 import { PROJECT_STATUSES } from '@/lib/projects/status';
-import { PROJECT_TAGS } from '@/lib/projects/tags';
 import { PROJECT_TYPES } from '@/lib/projects/template';
-import type { Database } from '@/types/database.types';
+import { PriorityPicker } from '@/components/projects/priority-picker';
+import type { Database, TaskPriority } from '@/types/database.types';
 
 type Project = Database['public']['Tables']['projects']['Row'];
-
-const PARA_OPTIONS = [
-  { value: 'project', label: 'Project' },
-  { value: 'area', label: 'Area' },
-  { value: 'resource', label: 'Resource' },
-  { value: 'archive', label: 'Archive' },
-];
 
 const initialState: ProjectFormState = { error: null };
 const field =
@@ -90,16 +83,22 @@ export function ProjectForm({
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="para_category" className="text-sm font-medium text-slate-700">
-            PARA category
+          <label htmlFor="project_type" className="text-sm font-medium text-slate-700">
+            Project type
           </label>
-          <select id="para_category" name="para_category" defaultValue={project?.para_category ?? 'project'} className={field}>
-            {PARA_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
+          <select
+            id="project_type"
+            name="project_type"
+            defaultValue={project?.project_type ?? 'brand_film'}
+            className={field}
+          >
+            {PROJECT_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
               </option>
             ))}
           </select>
+          {!editing && <span className="text-[11px] text-slate-400">Seeds the starting template.</span>}
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="start_date" className="text-sm font-medium text-slate-700">
@@ -115,24 +114,9 @@ export function ProjectForm({
         </div>
       </div>
 
-      {!editing && (
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="project_type" className="text-sm font-medium text-slate-700">
-            Project type <span className="text-slate-400">(seeds the template)</span>
-          </label>
-          <select id="project_type" name="project_type" defaultValue="brand_film" className={field}>
-            {PROJECT_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
       <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-slate-700">Tags</span>
-        <TagPicker initial={project?.tags ?? []} />
+        <span className="text-sm font-medium text-slate-700">Priority</span>
+        <PriorityPicker value={(project?.priority as TaskPriority) ?? 'medium'} name="priority" />
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -160,41 +144,5 @@ export function ProjectForm({
         </Link>
       </div>
     </form>
-  );
-}
-
-// Click-to-stack tag picker. Submits the selected tags as a single hidden
-// comma-separated field named "tags" (the server action splits + validates it).
-function TagPicker({ initial }: { initial: string[] }) {
-  const [selected, setSelected] = useState<string[]>(() => initial.filter((t) => PROJECT_TAGS.includes(t)));
-
-  function toggle(tag: string) {
-    setSelected((cur) => (cur.includes(tag) ? cur.filter((t) => t !== tag) : [...cur, tag]));
-  }
-
-  return (
-    <div>
-      <input type="hidden" name="tags" value={selected.join(',')} />
-      <div className="flex flex-wrap gap-2">
-        {PROJECT_TAGS.map((tag) => {
-          const on = selected.includes(tag);
-          return (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => toggle(tag)}
-              aria-pressed={on}
-              className={`rounded-full border px-3 py-1 text-sm transition-colors ${
-                on
-                  ? 'border-teal bg-teal/10 text-sea'
-                  : 'border-slate-200 bg-white text-slate-500 hover:border-teal/60 hover:text-slate-700'
-              }`}
-            >
-              {tag}
-            </button>
-          );
-        })}
-      </div>
-    </div>
   );
 }

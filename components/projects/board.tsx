@@ -1,10 +1,12 @@
 'use client';
 
-// The projects kanban. Seven columns matching the owner's Notion pipeline, with
-// live counts and drag-to-move between columns (dnd-kit). Moves are optimistic
-// (UI updates instantly) and persisted via the moveProject server action.
+// The projects kanban. Columns match the owner's Notion pipeline, with live
+// counts and drag-to-move (dnd-kit). Moves are optimistic and persisted via the
+// moveProject server action. Cards sort by priority then closest due date.
+// The Archived column is hidden behind a toggle.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   DndContext,
   DragOverlay,
@@ -17,6 +19,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { PROJECT_STATUSES } from '@/lib/projects/status';
+import { compareProjects } from '@/lib/projects/sort';
 import { moveProject } from '@/app/(app)/projects/actions';
 import type { ProjectStatus } from '@/types/database.types';
 import { ProjectCard, CardBody, type BoardProject } from './project-card';
@@ -24,9 +27,16 @@ import { ProjectCard, CardBody, type BoardProject } from './project-card';
 export function ProjectBoard({ initial }: { initial: BoardProject[] }) {
   const [projects, setProjects] = useState(initial);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
+  useEffect(() => setMounted(true), []);
+  useEffect(() => setProjects(initial), [initial]);
+
   const active = projects.find((p) => p.id === activeId) ?? null;
+  const columns = PROJECT_STATUSES.filter((c) => c.value !== 'archived' || showArchived);
+  const archivedCount = projects.filter((p) => p.status === 'archived').length;
 
   function onDragStart(e: DragStartEvent) {
     setActiveId(String(e.active.id));
@@ -39,7 +49,6 @@ export function ProjectBoard({ initial }: { initial: BoardProject[] }) {
     const newStatus = String(over.id) as ProjectStatus;
     const proj = projects.find((p) => p.id === String(active.id));
     if (!proj || proj.status === newStatus) return;
-    // Optimistic update, then persist.
     setProjects((prev) => prev.map((p) => (p.id === proj.id ? { ...p, status: newStatus } : p)));
     void moveProject(proj.id, newStatus);
   }
@@ -52,26 +61,42 @@ export function ProjectBoard({ initial }: { initial: BoardProject[] }) {
       onDragEnd={onDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
+      <div className="mb-3 flex justify-end">
+        <button
+          onClick={() => setShowArchived((s) => !s)}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-teal hover:text-sea"
+        >
+          {showArchived ? 'Hide archived' : `Show archived${archivedCount ? ` (${archivedCount})` : ''}`}
+        </button>
+      </div>
+
       <div className="flex gap-3 overflow-x-auto pb-4">
-        {PROJECT_STATUSES.map((col) => (
+        {columns.map((col) => (
           <Column
             key={col.value}
             status={col.value}
             label={col.label}
             pill={col.pill}
             soft={col.soft}
-            projects={projects.filter((p) => p.status === col.value)}
+            projects={projects.filter((p) => p.status === col.value).sort(compareProjects)}
             activeId={activeId}
           />
         ))}
       </div>
-      <DragOverlay dropAnimation={{ duration: 250, easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)' }}>
-        {active ? (
-          <div className="w-64">
-            <CardBody project={active} dragging />
-          </div>
-        ) : null}
-      </DragOverlay>
+
+      {/* Portal to <body> so the fixed overlay positions against the viewport
+          (not a transformed ancestor) and sits under the cursor. */}
+      {mounted &&
+        createPortal(
+          <DragOverlay dropAnimation={{ duration: 250, easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)' }}>
+            {active ? (
+              <div className="w-64">
+                <CardBody project={active} dragging />
+              </div>
+            ) : null}
+          </DragOverlay>,
+          document.body,
+        )}
     </DndContext>
   );
 }

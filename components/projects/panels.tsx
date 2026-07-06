@@ -27,6 +27,16 @@ type Milestone = Database['public']['Tables']['milestones']['Row'];
 
 const inputCls = 'rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal';
 
+// A number input with a leading "$" so budget/money fields read as dollars.
+function MoneyInput({ wrapperClassName = '', className = '', ...props }: React.InputHTMLAttributes<HTMLInputElement> & { wrapperClassName?: string }) {
+  return (
+    <div className={`relative ${wrapperClassName}`}>
+      <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
+      <input type="number" step="0.01" {...props} className={`w-full pl-6 ${className}`} />
+    </div>
+  );
+}
+
 function AddButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
@@ -149,7 +159,7 @@ export function ContractsPanel({ projectId, items }: { projectId: string; items:
     <div className="space-y-4">
       <form ref={ref} action={action} className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-3">
         <input name="title" required placeholder="Contract name…" className={`min-w-[180px] flex-1 ${inputCls}`} />
-        <input name="amount" type="number" step="0.01" placeholder="Amount" className={`w-28 ${inputCls}`} aria-label="Amount" />
+        <MoneyInput name="amount" placeholder="Amount" wrapperClassName="w-28" className={inputCls} aria-label="Amount" />
         <input name="signed_date" type="date" className={inputCls} aria-label="Signed date" />
         <AddButton label="Add contract" />
         {state.error && <p className="w-full text-sm text-red-600">{state.error}</p>}
@@ -193,7 +203,7 @@ export function ExpensesPanel({ projectId, items }: { projectId: string; items: 
       <form ref={ref} action={action} className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-3">
         <input name="label" required placeholder="Expense…" className={`min-w-[160px] flex-1 ${inputCls}`} />
         <input name="category" placeholder="Category" className={`w-32 ${inputCls}`} />
-        <input name="amount" type="number" step="0.01" placeholder="Amount" className={`w-28 ${inputCls}`} aria-label="Amount" />
+        <MoneyInput name="amount" placeholder="Amount" wrapperClassName="w-28" className={inputCls} aria-label="Amount" />
         <input name="spent_on" type="date" className={inputCls} aria-label="Date" />
         <AddButton label="Add expense" />
         {state.error && <p className="w-full text-sm text-red-600">{state.error}</p>}
@@ -240,8 +250,8 @@ export function BudgetPanel({ projectId, items, quoteTotal, expensesTotal }: {
 
       <form ref={ref} action={action} className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-3">
         <input name="label" required placeholder="Budget line…" className={`min-w-[180px] flex-1 ${inputCls}`} />
-        <input name="planned_amount" type="number" step="0.01" placeholder="Planned" className={`w-28 ${inputCls}`} aria-label="Planned" />
-        <input name="actual_amount" type="number" step="0.01" placeholder="Actual" className={`w-28 ${inputCls}`} aria-label="Actual" />
+        <MoneyInput name="planned_amount" placeholder="Planned" wrapperClassName="w-28" className={inputCls} aria-label="Planned" />
+        <MoneyInput name="actual_amount" placeholder="Actual" wrapperClassName="w-28" className={inputCls} aria-label="Actual" />
         <AddButton label="Add line" />
         {state.error && <p className="w-full text-sm text-red-600">{state.error}</p>}
       </form>
@@ -278,10 +288,10 @@ function BudgetRow({ b, projectId }: { b: BudgetLine; projectId: string }) {
   return (
     <li className="flex items-center gap-3 px-3 py-2">
       <span className="flex-1 text-sm text-ink">{b.label}</span>
-      <input type="number" step="0.01" defaultValue={b.planned_amount} onBlur={(e) => commit('planned_amount', e.target.value)}
-        className="w-28 rounded-md border border-slate-200 px-2 py-1 text-right text-sm outline-none focus:border-teal" aria-label="Planned amount" />
-      <input type="number" step="0.01" defaultValue={b.actual_amount} onBlur={(e) => commit('actual_amount', e.target.value)}
-        className="w-28 rounded-md border border-slate-200 px-2 py-1 text-right text-sm outline-none focus:border-teal" aria-label="Actual amount" />
+      <MoneyInput defaultValue={b.planned_amount} onBlur={(e) => commit('planned_amount', e.target.value)}
+        wrapperClassName="w-28" className="rounded-md border border-slate-200 py-1 pr-2 text-right text-sm outline-none focus:border-teal" aria-label="Planned amount" />
+      <MoneyInput defaultValue={b.actual_amount} onBlur={(e) => commit('actual_amount', e.target.value)}
+        wrapperClassName="w-28" className="rounded-md border border-slate-200 py-1 pr-2 text-right text-sm outline-none focus:border-teal" aria-label="Actual amount" />
       <div className="w-16 text-right"><DeleteInline action={deleteBudgetLine} id={b.id} projectId={projectId} /></div>
     </li>
   );

@@ -9,6 +9,7 @@ import { useFormStatus } from 'react-dom';
 import { motion } from 'motion/react';
 import { saveClient, type ClientFormState } from '@/app/(app)/clients/actions';
 import { Button } from '@/components/ui/button';
+import { CLIENT_TYPES } from '@/lib/projects/status';
 import type { Database } from '@/types/database.types';
 
 type Client = Database['public']['Tables']['clients']['Row'];
@@ -42,11 +43,25 @@ export function ClientForm({ client }: { client?: Client }) {
         <input id="name" name="name" required defaultValue={client?.name ?? ''} className={fieldClass} />
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="company" className="text-sm font-medium text-slate-700">
-          Company
-        </label>
-        <input id="company" name="company" defaultValue={client?.company ?? ''} className={fieldClass} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="company" className="text-sm font-medium text-slate-700">
+            Company
+          </label>
+          <input id="company" name="company" defaultValue={client?.company ?? ''} className={fieldClass} />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="client_type" className="text-sm font-medium text-slate-700">
+            Client type
+          </label>
+          <select id="client_type" name="client_type" defaultValue={client?.client_type ?? 'one_time'} className={fieldClass}>
+            {CLIENT_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
