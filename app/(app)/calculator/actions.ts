@@ -1,71 +1,84 @@
 'use server';
 
-// Server actions for the Price Calculator. All quote math happens HERE, not in
-// the browser — the UI's live totals are a convenience; the numbers stored come
-// from this file (amount = quantity × rate, subtotal = sum, total = subtotal).
+// Server actions for the Production Price Calculator. The browser shows live
+// totals for convenience, but the numbers STORED here are recomputed from the
+// selections against rates fetched fresh from the database — the client's math
+// is never trusted (CLAUDE.md rule #3).
 
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createClient as createSupabaseServer } from '@/lib/supabase/server';
-import { quoteSchema } from '@/lib/validation/quote';
+import { calculatorQuoteSchema } from '@/lib/validation/calculator';
 import { emptyToNull } from '@/lib/validation/client';
+import { computeQuote, DISCOUNT_LABELS, type PricingConfig } from '@/lib/pricing/engine';
 
 export type QuoteFormState = { error: string | null };
 
-const round2 = (n: number) => Math.round(n * 100) / 100;
-
-// Create (no id) or update (id present) a quote and its line items.
+// Create (no id) or update (id present) a quote from calculator selections.
 export async function saveQuote(_prev: QuoteFormState, formData: FormData): Promise<QuoteFormState> {
   const id = String(formData.get('id') ?? '').trim();
 
-  // The builder serializes its rows into one JSON field.
-  let rawItems: unknown;
+  let rawSelections: unknown;
   try {
-    rawItems = JSON.parse(String(formData.get('items') ?? '[]'));
+    rawSelections = JSON.parse(String(formData.get('selections') ?? '{}'));
   } catch {
-    return { error: 'Line items were malformed. Please try again.' };
+    return { error: 'The calculator state was malformed. Please try again.' };
   }
 
-  const parsed = quoteSchema.safeParse({
+  const parsed = calculatorQuoteSchema.safeParse({
     title: formData.get('title'),
     client_id: formData.get('client_id'),
     project_id: formData.get('project_id') ?? '',
     notes: formData.get('notes'),
-    items: rawItems,
+    selections: rawSelections,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Please check the form and try again.' };
   }
   const d = parsed.data;
 
-  // Server-side math — the stored numbers always come from here.
-  const items = d.items.map((it, i) => ({
-    label: it.label.trim(),
-    quantity: round2(it.quantity),
-    unit: emptyToNull(it.unit),
-    rate: round2(it.rate),
-    amount: round2(it.quantity * it.rate),
-    position: i,
-  }));
-  const subtotal = round2(items.reduce((sum, it) => sum + it.amount, 0));
-  const total = subtotal; // v1: no tax/discount — total mirrors subtotal.
+  const supabase = await createSupabaseServer();
+
+  // Authoritative rates, fresh from the database.
+  const [{ data: roles }, { data: services }, { data: configRows }] = await Promise.all([
+    supabase.from('pricing_roles').select('*').order('sort'),
+    supabase.from('pricing_page_services').select('*').order('sort'),
+    supabase.from('pricing_config').select('*'),
+  ]);
+  if (!roles || !services || !configRows) {
+    return { error: 'Could not load pricing rates. Has the pricing migration been applied?' };
+  }
+  const config: PricingConfig = Object.fromEntries(configRows.map((c) => [c.key, c.value]));
+
+  const q = computeQuote(d.selections, roles, services, config);
+  if (q.lines.length === 0) {
+    return { error: 'Nothing is selected yet — pick at least one crew role or service.' };
+  }
+
+  // Note the applied discounts on the quote so they're visible later.
+  let notes = emptyToNull(d.notes);
+  if (d.selections.discounts.length > 0) {
+    const parts = d.selections.discounts.map(
+      (k) => `${DISCOUNT_LABELS[k]} −${config[`discount_${k}`] ?? 0}%`,
+    );
+    const note = `Discounts applied: ${parts.join(', ')}`;
+    notes = notes ? `${notes}\n\n${note}` : note;
+  }
 
   const values = {
     title: d.title.trim(),
     client_id: d.client_id,
     project_id: d.project_id && d.project_id !== '' ? d.project_id : null,
-    notes: emptyToNull(d.notes),
-    subtotal,
-    total,
+    notes,
+    subtotal: q.overall, // pre-discount ("Overall Total" on the sheet)
+    total: q.total, // after discounts ("Discount Total")
+    calculator_state: d.selections,
   };
-
-  const supabase = await createSupabaseServer();
 
   let quoteId = id;
   if (id) {
     const { error } = await supabase.from('quotes').update(values).eq('id', id);
     if (error) return { error: 'Could not save the quote. Please try again.' };
-    // Replace line items wholesale — simplest correct update for a small list.
     const { error: delError } = await supabase.from('quote_line_items').delete().eq('quote_id', id);
     if (delError) return { error: 'Could not update the line items. Please try again.' };
   } else {
@@ -76,7 +89,7 @@ export async function saveQuote(_prev: QuoteFormState, formData: FormData): Prom
 
   const { error: itemsError } = await supabase
     .from('quote_line_items')
-    .insert(items.map((it) => ({ ...it, quote_id: quoteId })));
+    .insert(q.lines.map((line, i) => ({ ...line, quote_id: quoteId, position: i })));
   if (itemsError) return { error: 'The quote saved but its line items failed. Please reopen and try again.' };
 
   revalidatePath('/calculator');

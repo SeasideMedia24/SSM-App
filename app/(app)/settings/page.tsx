@@ -1,18 +1,21 @@
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader, ComingSoon } from '@/components/page-header';
 import { PublicOnboardLink } from '@/components/settings/public-onboard-link';
-import { RatePresets } from '@/components/settings/rate-presets';
+import { PricingEngine } from '@/components/settings/pricing-engine';
 
 export default async function SettingsPage() {
   const supabase = await createClient();
-  const { data: presets } = await supabase
-    .from('rate_presets')
-    .select('id, label, unit, default_rate')
-    .order('label');
+  const [{ data: roles }, { data: services }, { data: configRows }] = await Promise.all([
+    supabase.from('pricing_roles').select('*').order('sort'),
+    supabase.from('pricing_page_services').select('*').order('sort'),
+    supabase.from('pricing_config').select('*'),
+  ]);
+  const config = Object.fromEntries((configRows ?? []).map((c) => [c.key, c.value]));
+  const ratesMissing = !roles || roles.length === 0;
 
   return (
     <>
-      <PageHeader title="Settings" description="Manage onboarding, rate presets, and team members." />
+      <PageHeader title="Settings" description="Manage onboarding, pricing, and team members." />
 
       <section className="mb-8">
         <h2 className="mb-3 text-sm font-semibold text-slate-900">Client onboarding</h2>
@@ -27,8 +30,16 @@ export default async function SettingsPage() {
       </section>
 
       <section className="mb-8">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Rate presets</h2>
-        <RatePresets presets={presets ?? []} />
+        <h2 className="mb-3 text-sm font-semibold text-slate-900">Pricing engine</h2>
+        {ratesMissing ? (
+          <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Pricing rates aren’t loaded yet — run the migration
+            {' '}<code className="rounded bg-amber-100 px-1">20260707000001_pricing_engine.sql</code>{' '}
+            in the Supabase SQL Editor (see supabase/README.md), then refresh.
+          </p>
+        ) : (
+          <PricingEngine roles={roles ?? []} services={services ?? []} config={config} />
+        )}
       </section>
 
       <section>

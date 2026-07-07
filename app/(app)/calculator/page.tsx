@@ -1,15 +1,16 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
-import { QuoteBuilder, type QuoteInitial } from '@/components/calculator/quote-builder';
+import { ProductionCalculator, type QuoteInitial } from '@/components/calculator/production-calculator';
 import { DeleteQuoteButton } from '@/components/calculator/delete-quote-button';
 import { QuoteStatusSelect } from '@/components/calculator/quote-status-select';
 import { money } from '@/lib/projects/format';
+import type { CalculatorSelections } from '@/lib/pricing/engine';
 import type { QuoteStatus } from '@/types/database.types';
 
-// The Price Calculator: build a line-item quote from rate presets (or custom
-// lines) and save it against a client. Saved quotes are listed below; "Open"
-// reloads one into the builder via ?quote=<id>.
+// The Production Price Calculator — a web version of the owner's pricing
+// spreadsheet. Pick crew/services/amounts, totals compute live, save as a
+// quote. Saved quotes list below; "Open" restores the exact selections.
 
 export default async function CalculatorPage({
   searchParams,
@@ -19,53 +20,83 @@ export default async function CalculatorPage({
   const { quote: editId } = await searchParams;
   const supabase = await createClient();
 
-  const [{ data: clients }, { data: projects }, { data: presets }, { data: quotes, error }] = await Promise.all([
+  const [
+    { data: clients },
+    { data: projects },
+    { data: roles },
+    { data: services },
+    { data: configRows },
+    { data: quotes, error },
+  ] = await Promise.all([
     supabase.from('clients').select('id, name, company').order('name'),
     supabase.from('projects').select('id, title, client_id').order('title'),
-    supabase.from('rate_presets').select('id, label, unit, default_rate').order('label'),
+    supabase.from('pricing_roles').select('*').order('sort'),
+    supabase.from('pricing_page_services').select('*').order('sort'),
+    supabase.from('pricing_config').select('*'),
     supabase
       .from('quotes')
       .select('id, title, status, total, created_at, client_id, clients ( name )')
       .order('created_at', { ascending: false }),
   ]);
 
-  // Edit mode: load the requested quote + its items into the builder.
+  const config = Object.fromEntries((configRows ?? []).map((c) => [c.key, c.value]));
+  const ratesMissing = !roles || roles.length === 0;
+
+  // Edit mode: restore the saved picker selections.
   let initial: QuoteInitial | undefined;
+  let legacyQuote = false;
   if (editId) {
-    const [{ data: q }, { data: items }] = await Promise.all([
-      supabase.from('quotes').select('id, title, client_id, project_id, notes').eq('id', editId).single(),
-      supabase.from('quote_line_items').select('label, quantity, unit, rate').eq('quote_id', editId).order('position'),
-    ]);
-    if (q) initial = { ...q, items: items ?? [] };
+    const { data: q } = await supabase
+      .from('quotes')
+      .select('id, title, client_id, project_id, notes, calculator_state')
+      .eq('id', editId)
+      .single();
+    if (q) {
+      const state = (q.calculator_state as CalculatorSelections | null) ?? null;
+      legacyQuote = !state;
+      initial = { id: q.id, title: q.title, client_id: q.client_id, project_id: q.project_id, notes: q.notes, selections: state };
+    }
   }
 
   return (
     <>
       <PageHeader
         title="Price Calculator"
-        description="Build a line-item quote from rate presets and save it against a client."
+        description="Pick the crew, services, and amounts — pricing follows your rate sheet."
         action={
           <Link href="/settings" className="text-sm font-medium text-sea hover:underline">
-            Edit rate presets →
+            Edit rates →
           </Link>
         }
       />
 
       <div className="flex flex-col gap-8">
-        {initial && (
-          <p className="rounded-xl bg-aqua/15 px-3 py-2 text-sm text-sea">
-            Editing “{initial.title}” — saving will update the existing quote.
+        {ratesMissing && (
+          <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Pricing rates aren’t loaded yet — run the migration
+            {' '}<code className="rounded bg-amber-100 px-1">20260707000001_pricing_engine.sql</code>{' '}
+            in the Supabase SQL Editor (see supabase/README.md), then refresh.
           </p>
         )}
 
-        {/* key resets the builder's state when switching between new/edit */}
-        <QuoteBuilder
-          key={initial?.id ?? 'new'}
-          clients={clients ?? []}
-          projects={projects ?? []}
-          presets={presets ?? []}
-          initial={initial}
-        />
+        {initial && (
+          <p className="rounded-xl bg-aqua/15 px-3 py-2 text-sm text-sea">
+            Editing “{initial.title}” — saving will update the existing quote.
+            {legacyQuote && ' This quote was built with the old calculator, so its selections start fresh (its saved totals are unchanged until you save).'}
+          </p>
+        )}
+
+        {!ratesMissing && (
+          <ProductionCalculator
+            key={initial?.id ?? 'new'}
+            clients={clients ?? []}
+            projects={projects ?? []}
+            roles={roles ?? []}
+            services={services ?? []}
+            config={config}
+            initial={initial}
+          />
+        )}
 
         {/* Saved quotes */}
         <section>

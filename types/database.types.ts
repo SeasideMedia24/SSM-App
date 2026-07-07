@@ -19,6 +19,11 @@ export type TaskPriority = 'low' | 'medium' | 'high';
 export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'declined';
 export type ClientType = 'recurring' | 'one_time' | 'campaign';
 export type ContractStatus = 'draft' | 'sent' | 'signed' | 'declined';
+export type PricingRoleKind = 'standard' | 'photographer' | 'drone';
+export type PricingPhase = 'pre' | 'post';
+
+// Generic JSON column type (quotes.calculator_state).
+export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
 export type Database = {
   public: {
@@ -197,6 +202,7 @@ export type Database = {
           subtotal: number;
           total: number;
           notes: string | null;
+          calculator_state: Json | null;
           created_at: string;
         };
         Insert: {
@@ -208,6 +214,7 @@ export type Database = {
           subtotal?: number;
           total?: number;
           notes?: string | null;
+          calculator_state?: Json | null;
           created_at?: string;
         };
         Update: {
@@ -219,6 +226,7 @@ export type Database = {
           subtotal?: number;
           total?: number;
           notes?: string | null;
+          calculator_state?: Json | null;
           created_at?: string;
         };
         Relationships: [
@@ -297,6 +305,78 @@ export type Database = {
           unit?: string;
           default_rate?: number;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      pricing_roles: {
+        Row: {
+          id: string;
+          name: string;
+          kind: PricingRoleKind;
+          day_rate: number;
+          half_rate: number;
+          hour_rate: number;
+          has_quantity: boolean;
+          sort: number;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          kind?: PricingRoleKind;
+          day_rate?: number;
+          half_rate?: number;
+          hour_rate?: number;
+          has_quantity?: boolean;
+          sort?: number;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          kind?: PricingRoleKind;
+          day_rate?: number;
+          half_rate?: number;
+          hour_rate?: number;
+          has_quantity?: boolean;
+          sort?: number;
+        };
+        Relationships: [];
+      };
+      pricing_page_services: {
+        Row: {
+          id: string;
+          name: string;
+          phase: PricingPhase;
+          page_rate: number;
+          sort: number;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          phase: PricingPhase;
+          page_rate?: number;
+          sort?: number;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          phase?: PricingPhase;
+          page_rate?: number;
+          sort?: number;
+        };
+        Relationships: [];
+      };
+      pricing_config: {
+        Row: {
+          key: string;
+          value: number;
+        };
+        Insert: {
+          key: string;
+          value?: number;
+        };
+        Update: {
+          key?: string;
+          value?: number;
         };
         Relationships: [];
       };
