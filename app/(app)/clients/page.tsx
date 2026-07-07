@@ -8,7 +8,7 @@ export default async function ClientsPage() {
   const supabase = await createClient();
   const { data: clients, error } = await supabase
     .from('clients')
-    .select('id, name, company, email, client_type, created_at')
+    .select('id, name, company, email, client_type, onboarded_at, created_at')
     .order('name', { ascending: true });
 
   return (
@@ -58,6 +58,9 @@ export default async function ClientsPage() {
                       <Link href={`/clients/${c.id}`} className="font-medium text-slate-900 hover:underline">
                         {c.name}
                       </Link>
+                      {c.onboarded_at && (
+                        <span className="ml-2 rounded-full bg-teal/15 px-2 py-0.5 text-[10px] font-medium text-sea">Onboarded</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${t.pill}`}>{t.label}</span>

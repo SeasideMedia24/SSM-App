@@ -56,6 +56,8 @@ export type Database = {
           phone: string | null;
           notes: string | null;
           client_type: ClientType;
+          onboard_token: string | null;
+          onboarded_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -66,6 +68,8 @@ export type Database = {
           phone?: string | null;
           notes?: string | null;
           client_type?: ClientType;
+          onboard_token?: string | null;
+          onboarded_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -76,6 +80,8 @@ export type Database = {
           phone?: string | null;
           notes?: string | null;
           client_type?: ClientType;
+          onboard_token?: string | null;
+          onboarded_at?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -494,6 +500,70 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: 'milestones_project_id_fkey';
+            columns: ['project_id'];
+            referencedRelation: 'projects';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      onboarding_submissions: {
+        Row: {
+          id: string;
+          name: string;
+          company: string | null;
+          email: string | null;
+          phone: string | null;
+          project_type: string | null;
+          project_description: string | null;
+          budget_range: string | null;
+          desired_timeline: string | null;
+          heard_from: string | null;
+          status: string;
+          client_id: string | null;
+          project_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          company?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          project_type?: string | null;
+          project_description?: string | null;
+          budget_range?: string | null;
+          desired_timeline?: string | null;
+          heard_from?: string | null;
+          status?: string;
+          client_id?: string | null;
+          project_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          company?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          project_type?: string | null;
+          project_description?: string | null;
+          budget_range?: string | null;
+          desired_timeline?: string | null;
+          heard_from?: string | null;
+          status?: string;
+          client_id?: string | null;
+          project_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'onboarding_submissions_client_id_fkey';
+            columns: ['client_id'];
+            referencedRelation: 'clients';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'onboarding_submissions_project_id_fkey';
             columns: ['project_id'];
             referencedRelation: 'projects';
             referencedColumns: ['id'];

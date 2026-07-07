@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/page-header';
 import { DeleteClientButton } from '@/components/delete-client-button';
 import { buttonClass } from '@/components/ui/button-styles';
 import { clientTypeMeta } from '@/lib/projects/status';
+import { InviteControl } from '@/components/clients/invite-control';
 
 // In Next.js 16, `params` and `searchParams` are Promises and must be awaited.
 export default async function ClientDetailPage({
@@ -49,10 +50,13 @@ export default async function ClientDetailPage({
         }
       />
 
-      <div className="-mt-3 mb-6">
+      <div className="-mt-3 mb-6 flex items-center gap-2">
         <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${clientTypeMeta(client.client_type).pill}`}>
           {clientTypeMeta(client.client_type).label}
         </span>
+        {client.onboarded_at && (
+          <span className="rounded-full bg-teal/15 px-2 py-0.5 text-[11px] font-medium text-sea">Onboarded</span>
+        )}
       </div>
 
       {errorFlag === 'delete' && (
@@ -67,6 +71,16 @@ export default async function ClientDetailPage({
         <Detail label="Phone" value={client.phone} />
         <Detail label="Notes" value={client.notes} full />
       </div>
+
+      {/* Onboarding invite */}
+      <Section title="Onboarding">
+        <div className="flex flex-col gap-2 py-1">
+          <p className="text-sm text-slate-500">
+            Send a private link so this client can fill in their own details (updates this record).
+          </p>
+          <InviteControl clientId={client.id} token={client.onboard_token} />
+        </div>
+      </Section>
 
       {/* Projects */}
       <Section title="Projects">

@@ -61,6 +61,16 @@ export async function saveClient(
   redirect(`/clients/${savedId}`);
 }
 
+// Generate (or refresh) a private onboarding invite token for a client. The
+// owner shares the resulting /onboard/<token> link; the client completes their
+// own details, which updates this record.
+export async function generateOnboardToken(clientId: string) {
+  if (!clientId) return;
+  const supabase = await createSupabaseServer();
+  await supabase.from('clients').update({ onboard_token: crypto.randomUUID() }).eq('id', clientId);
+  revalidatePath(`/clients/${clientId}`);
+}
+
 // Delete a client. The UI must confirm before calling this (CLAUDE.md rule #4).
 export async function deleteClient(formData: FormData) {
   const id = String(formData.get('id') ?? '').trim();
