@@ -4,7 +4,7 @@
 // /onboard/<token> link the owner can copy — or email in one click — and the
 // client fills in their own details, which update this client record.
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { generateOnboardToken } from '@/app/(app)/clients/actions';
 
 export function InviteControl({
@@ -21,7 +21,11 @@ export function InviteControl({
   const [pending, start] = useTransition();
   const [copied, setCopied] = useState(false);
 
-  const link = token && typeof window !== 'undefined' ? `${window.location.origin}/onboard/${token}` : '';
+  // Origin is read after mount so the server and first client render match
+  // (avoids a hydration mismatch on the link/mailto attributes).
+  const [origin, setOrigin] = useState('');
+  useEffect(() => setOrigin(window.location.origin), []);
+  const link = token && origin ? `${origin}/onboard/${token}` : '';
 
   // Pre-written invite email — opens in the owner's mail app, ready to send.
   // Edit the subject/body text here to change the message.

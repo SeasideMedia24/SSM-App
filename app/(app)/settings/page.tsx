@@ -1,7 +1,15 @@
+import { createClient } from '@/lib/supabase/server';
 import { PageHeader, ComingSoon } from '@/components/page-header';
 import { PublicOnboardLink } from '@/components/settings/public-onboard-link';
+import { RatePresets } from '@/components/settings/rate-presets';
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const supabase = await createClient();
+  const { data: presets } = await supabase
+    .from('rate_presets')
+    .select('id, label, unit, default_rate')
+    .order('label');
+
   return (
     <>
       <PageHeader title="Settings" description="Manage onboarding, rate presets, and team members." />
@@ -18,8 +26,13 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      <section className="mb-8">
+        <h2 className="mb-3 text-sm font-semibold text-slate-900">Rate presets</h2>
+        <RatePresets presets={presets ?? []} />
+      </section>
+
       <section>
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Rate presets &amp; team</h2>
+        <h2 className="mb-3 text-sm font-semibold text-slate-900">Team</h2>
         <ComingSoon phase="Phase 7" />
       </section>
     </>

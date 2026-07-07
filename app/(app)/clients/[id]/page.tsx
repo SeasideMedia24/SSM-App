@@ -4,8 +4,10 @@ import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
 import { DeleteClientButton } from '@/components/delete-client-button';
 import { buttonClass } from '@/components/ui/button-styles';
-import { clientTypeMeta } from '@/lib/projects/status';
+import { clientTypeMeta, quoteStatusMeta } from '@/lib/projects/status';
+import { money } from '@/lib/projects/format';
 import { InviteControl } from '@/components/clients/invite-control';
+import type { QuoteStatus } from '@/types/database.types';
 
 // In Next.js 16, `params` and `searchParams` are Promises and must be awaited.
 export default async function ClientDetailPage({
@@ -102,14 +104,20 @@ export default async function ClientDetailPage({
       <Section title="Quotes">
         {quotes && quotes.length > 0 ? (
           <ul className="divide-y divide-slate-100">
-            {quotes.map((q) => (
-              <li key={q.id} className="flex items-center justify-between py-2 text-sm">
-                <span className="text-slate-900">{q.title}</span>
-                <span className="text-slate-500">
-                  {q.status} · {q.total}
-                </span>
-              </li>
-            ))}
+            {quotes.map((q) => {
+              const meta = quoteStatusMeta(q.status as QuoteStatus);
+              return (
+                <li key={q.id} className="flex items-center justify-between py-2 text-sm">
+                  <Link href={`/calculator?quote=${q.id}`} className="text-slate-900 hover:underline">
+                    {q.title}
+                  </Link>
+                  <span className="flex items-center gap-2">
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${meta.pill}`}>{meta.label}</span>
+                    <span className="font-medium text-slate-700">{money(q.total)}</span>
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <Empty>No quotes for this client yet.</Empty>

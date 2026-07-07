@@ -2,7 +2,9 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
 import { proj, type ProjRel } from '@/components/projects/global-table';
-import { fmtDate } from '@/lib/projects/format';
+import { fmtDate, money } from '@/lib/projects/format';
+import { quoteStatusMeta } from '@/lib/projects/status';
+import type { QuoteStatus } from '@/types/database.types';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -13,11 +15,13 @@ export default async function DashboardPage() {
     { data: overdueDeliverables },
     { data: upcoming },
     { count: activeProjects },
+    { data: recentQuotes },
   ] = await Promise.all([
     supabase.from('tasks').select('id, title, due_date, projects(id, title)').lt('due_date', today).neq('status', 'done').order('due_date'),
     supabase.from('deliverables').select('id, title, due_date, projects(id, title)').lt('due_date', today).neq('status', 'done').order('due_date'),
     supabase.from('milestones').select('id, title, date, projects(id, title)').gte('date', today).order('date').limit(8),
     supabase.from('projects').select('id', { count: 'exact', head: true }).neq('status', 'archived'),
+    supabase.from('quotes').select('id, title, status, total, clients ( name )').order('created_at', { ascending: false }).limit(5),
   ]);
 
   const oTasks = overdueTasks ?? [];
@@ -53,6 +57,30 @@ export default async function DashboardPage() {
           ) : (
             <ul className="divide-y divide-slate-100">
               {up.map((m) => <FlagRow key={m.id} label={m.title} kind="Milestone" date={m.date} rel={m.projects as ProjRel} view="timeline" />)}
+            </ul>
+          )}
+        </Panel>
+
+        <Panel title="Recent quotes">
+          {!recentQuotes || recentQuotes.length === 0 ? (
+            <Empty>
+              No quotes yet — build one in the{' '}
+              <Link href="/calculator" className="text-sea underline">Price Calculator</Link>.
+            </Empty>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {recentQuotes.map((q) => {
+                const meta = quoteStatusMeta(q.status as QuoteStatus);
+                const clientName = (q.clients as unknown as { name: string } | null)?.name;
+                return (
+                  <li key={q.id} className="flex items-center gap-3 py-2 text-sm">
+                    <Link href={`/calculator?quote=${q.id}`} className="text-ink hover:underline">{q.title}</Link>
+                    {clientName && <span className="text-xs text-slate-500">{clientName}</span>}
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${meta.pill}`}>{meta.label}</span>
+                    <span className="ml-auto font-medium text-slate-700">{money(q.total)}</span>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Panel>
