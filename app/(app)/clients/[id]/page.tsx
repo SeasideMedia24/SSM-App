@@ -78,7 +78,7 @@ export default async function ClientDetailPage({
           <p className="text-sm text-slate-500">
             Send a private link so this client can fill in their own details (updates this record).
           </p>
-          <InviteControl clientId={client.id} token={client.onboard_token} />
+          <InviteControl clientId={client.id} clientName={client.name} email={client.email} token={client.onboard_token} />
         </div>
       </Section>
 

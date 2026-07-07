@@ -16,6 +16,7 @@ type NavItem = { href: string; label: string; icon: React.ReactNode; children?: 
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: <IconGrid /> },
   { href: '/clients', label: 'Clients', icon: <IconUsers /> },
+  { href: '/inquiries', label: 'Inquiries', icon: <IconInbox /> },
   {
     href: '/projects',
     label: 'Projects',
@@ -177,6 +178,14 @@ function IconUsers() {
   return (
     <svg {...iconProps()}>
       <circle cx="9" cy="8" r="3" /><path d="M15 11a3 3 0 1 0-1-5.83" /><path d="M3 20a6 6 0 0 1 12 0" /><path d="M17 14a6 6 0 0 1 4 6" />
+    </svg>
+  );
+}
+function IconInbox() {
+  return (
+    <svg {...iconProps()}>
+      <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
     </svg>
   );
 }
