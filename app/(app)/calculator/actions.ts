@@ -110,6 +110,27 @@ export async function setQuoteStatus(formData: FormData) {
   revalidatePath('/dashboard');
 }
 
+// Create (or replace) the private share link for a quote. A fresh random
+// token invalidates any previously sent link.
+export async function generateQuoteShareToken(formData: FormData) {
+  const id = String(formData.get('id') ?? '').trim();
+  if (!id) return;
+
+  const supabase = await createSupabaseServer();
+  await supabase.from('quotes').update({ share_token: crypto.randomUUID() }).eq('id', id);
+  revalidatePath('/calculator');
+}
+
+// Turn a quote's share link off entirely.
+export async function revokeQuoteShareToken(formData: FormData) {
+  const id = String(formData.get('id') ?? '').trim();
+  if (!id) return;
+
+  const supabase = await createSupabaseServer();
+  await supabase.from('quotes').update({ share_token: null }).eq('id', id);
+  revalidatePath('/calculator');
+}
+
 // Delete a quote (line items cascade). The UI must confirm before calling this
 // (CLAUDE.md rule #4).
 export async function deleteQuote(formData: FormData) {

@@ -11,8 +11,9 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-// Routes a signed-out user is allowed to see (login + the public onboarding form).
-const PUBLIC_PREFIXES = ['/login', '/auth', '/onboard'];
+// Routes a signed-out user is allowed to see (login, the public onboarding
+// form, and shared quote links).
+const PUBLIC_PREFIXES = ['/login', '/auth', '/onboard', '/quote'];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });

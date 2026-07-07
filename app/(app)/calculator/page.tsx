@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/page-header';
 import { ProductionCalculator, type QuoteInitial } from '@/components/calculator/production-calculator';
 import { DeleteQuoteButton } from '@/components/calculator/delete-quote-button';
 import { QuoteStatusSelect } from '@/components/calculator/quote-status-select';
+import { ShareQuoteControl } from '@/components/calculator/share-quote-control';
 import { money } from '@/lib/projects/format';
 import type { CalculatorSelections } from '@/lib/pricing/engine';
 import type { QuoteStatus } from '@/types/database.types';
@@ -35,7 +36,7 @@ export default async function CalculatorPage({
     supabase.from('pricing_config').select('*'),
     supabase
       .from('quotes')
-      .select('id, title, status, total, created_at, client_id, clients ( name )')
+      .select('id, title, status, total, created_at, client_id, share_token, clients ( name )')
       .order('created_at', { ascending: false }),
   ]);
 
@@ -151,6 +152,7 @@ export default async function CalculatorPage({
                             <Link href={`/calculator?quote=${q.id}`} className="text-xs font-medium text-sea hover:underline">
                               Open
                             </Link>
+                            <ShareQuoteControl quoteId={q.id} token={q.share_token} />
                             <DeleteQuoteButton quoteId={q.id} quoteTitle={q.title} />
                           </div>
                         </td>

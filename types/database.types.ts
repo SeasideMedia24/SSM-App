@@ -203,6 +203,7 @@ export type Database = {
           total: number;
           notes: string | null;
           calculator_state: Json | null;
+          share_token: string | null;
           created_at: string;
         };
         Insert: {
@@ -215,6 +216,7 @@ export type Database = {
           total?: number;
           notes?: string | null;
           calculator_state?: Json | null;
+          share_token?: string | null;
           created_at?: string;
         };
         Update: {
@@ -227,6 +229,7 @@ export type Database = {
           total?: number;
           notes?: string | null;
           calculator_state?: Json | null;
+          share_token?: string | null;
           created_at?: string;
         };
         Relationships: [
