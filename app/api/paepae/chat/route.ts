@@ -19,7 +19,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getAnthropic, PAEPAE_MODEL } from '@/lib/paepae/client';
 import { paepaeSystemPrompt } from '@/lib/paepae/system';
 import { allPaepaeTools, runTool, actionFromToolName } from '@/lib/paepae/tools';
-import { validateAction, describeAction, type Proposal } from '@/lib/paepae/actions';
+import { validateAction, buildProposal } from '@/lib/paepae/actions';
 
 export const runtime = 'nodejs';
 
@@ -129,9 +129,20 @@ export async function POST(req: NextRequest) {
                 });
                 continue;
               }
-              const summary = await describeAction(action, checked.params, supabase);
-              const proposal: Proposal = { action, params: checked.params, summary };
-              emit({ t: 'proposal', proposal });
+              // buildProposal also verifies referenced records exist under RLS.
+              // If an id doesn't resolve, we DON'T show a card — we hand the
+              // error back so PaePae can look the id up again and retry.
+              const built = await buildProposal(action, checked.params, supabase);
+              if (!built.ok) {
+                toolResults.push({
+                  type: 'tool_result',
+                  tool_use_id: block.id,
+                  content: built.error,
+                  is_error: true,
+                });
+                continue;
+              }
+              emit({ t: 'proposal', proposal: built.proposal });
               toolResults.push({
                 type: 'tool_result',
                 tool_use_id: block.id,

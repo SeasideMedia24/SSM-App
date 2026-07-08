@@ -164,28 +164,81 @@ export type Proposal = {
   summary: string[];
 };
 
-// ── Friendly summaries ───────────────────────────────────────────────────────
-// Resolves related record names (so cards say "Project: Rock Jar reel", not a
-// UUID) and lists the changes. Read-only; runs at propose time.
+// ── Quote maths (pure, server-authoritative) ─────────────────────────────────
+// Line totals and the subtotal are ALWAYS computed here — never taken from the
+// model or the browser. Kept as a standalone pure function so it can be unit
+// tested and reused by both the proposal summary and the actual insert.
+
+export type QuoteLineItemRow = {
+  label: string;
+  quantity: number;
+  unit: string | null;
+  rate: number;
+  amount: number;
+  position: number;
+};
+
+export function computeQuoteLineItems(
+  lineItems: ActionParams<'create_quote'>['line_items'],
+): { items: QuoteLineItemRow[]; subtotal: number } {
+  const items: QuoteLineItemRow[] = lineItems.map((item, i) => ({
+    label: item.label,
+    quantity: item.quantity,
+    unit: item.unit ?? null,
+    rate: item.rate,
+    // Round each line to cents so the subtotal can't drift on float noise.
+    amount: Math.round(item.quantity * item.rate * 100) / 100,
+    position: i,
+  }));
+  const subtotal = Math.round(items.reduce((s, it) => s + it.amount, 0) * 100) / 100;
+  return { items, subtotal };
+}
+
+// ── Friendly DB errors ───────────────────────────────────────────────────────
+// Turn raw Postgres errors into plain language for a non-technical owner. The
+// most likely one now is a foreign-key violation when a referenced record was
+// deleted between the proposal and the Confirm click.
+
+function friendlyError(error: { code?: string; message?: string }): Error {
+  const byCode: Record<string, string> = {
+    '23503':
+      'That was linked to a record that no longer exists — it may have been deleted since I proposed this. Look it up again and retry.',
+    '23502': 'A required field was missing.',
+    '23505': 'That already exists.',
+    '23514': 'One of the values wasn’t allowed.',
+    '22P02': 'One of the values wasn’t in the expected format.',
+  };
+  return new Error((error.code && byCode[error.code]) || error.message || 'The action failed.');
+}
+
+// ── Building a proposal ──────────────────────────────────────────────────────
+// Runs at propose time (read-only). It (1) verifies every referenced record
+// actually exists and is visible under RLS — refusing to show a card for an
+// invented id — and (2) builds the human-readable summary lines. Returning a
+// clear error instead lets PaePae self-correct (look the id up again) rather
+// than showing a broken card that would fail on Confirm.
 
 const nice = (s: string) => s.replaceAll('_', ' ');
 
-export async function describeAction(
+export async function buildProposal(
   action: ActionName,
   params: Record<string, unknown>,
   supabase: DB,
-): Promise<string[]> {
+): Promise<{ ok: true; proposal: Proposal } | { ok: false; error: string }> {
   const lines: string[] = [];
   const skip = new Set(['project_id', 'client_id', 'task_id', 'line_items']);
 
-  // Resolve IDs to names for context.
+  // Resolve IDs to names AND verify they exist. A missing one aborts the card.
   if (typeof params.project_id === 'string') {
     const { data } = await supabase
       .from('projects')
       .select('title')
       .eq('id', params.project_id)
       .maybeSingle();
-    lines.push(`Project: ${data?.title ?? 'unknown project'}`);
+    if (!data) {
+      return { ok: false, error: `No project matches that id. Use list_projects to get a real id, then try again.` };
+    }
+    lines.push(`Project: ${data.title}`);
   }
   if (typeof params.client_id === 'string') {
     const { data } = await supabase
@@ -193,7 +246,10 @@ export async function describeAction(
       .select('name')
       .eq('id', params.client_id)
       .maybeSingle();
-    lines.push(`Client: ${data?.name ?? 'unknown client'}`);
+    if (!data) {
+      return { ok: false, error: `No client matches that id. Use list_clients to get a real id, then try again.` };
+    }
+    lines.push(`Client: ${data.name}`);
   }
   if (typeof params.task_id === 'string') {
     const { data } = await supabase
@@ -201,7 +257,10 @@ export async function describeAction(
       .select('title')
       .eq('id', params.task_id)
       .maybeSingle();
-    lines.push(`Task: ${data?.title ?? 'unknown task'}`);
+    if (!data) {
+      return { ok: false, error: `No task matches that id. Use list_tasks to get a real id, then try again.` };
+    }
+    lines.push(`Task: ${data.title}`);
   }
 
   // List the fields being set/changed.
@@ -210,20 +269,20 @@ export async function describeAction(
     lines.push(`${nice(key)[0].toUpperCase()}${nice(key).slice(1)}: ${value === null ? '(cleared)' : nice(String(value))}`);
   }
 
-  // Quote line items get their own block with a computed total.
+  // Quote line items get their own block with a server-computed total.
   if (action === 'create_quote' && Array.isArray(params.line_items)) {
-    let total = 0;
-    for (const item of params.line_items as ActionParams<'create_quote'>['line_items']) {
-      const amount = item.quantity * item.rate;
-      total += amount;
+    const { items, subtotal } = computeQuoteLineItems(
+      params.line_items as ActionParams<'create_quote'>['line_items'],
+    );
+    for (const item of items) {
       lines.push(
-        `• ${item.label} — ${item.quantity}${item.unit ? ` ${item.unit}` : ''} × $${item.rate.toLocaleString()} = $${amount.toLocaleString()}`,
+        `• ${item.label} — ${item.quantity}${item.unit ? ` ${item.unit}` : ''} × $${item.rate.toLocaleString()} = $${item.amount.toLocaleString()}`,
       );
     }
-    lines.push(`Total: $${total.toLocaleString()} (saved as a draft)`);
+    lines.push(`Total: $${subtotal.toLocaleString()} (saved as a draft)`);
   }
 
-  return lines;
+  return { ok: true, proposal: { action, params, summary: lines } };
 }
 
 // ── Execution ────────────────────────────────────────────────────────────────
@@ -250,7 +309,7 @@ export async function executeAction(
         .insert(p)
         .select('id, title')
         .single();
-      if (error) throw new Error(error.message);
+      if (error) throw friendlyError(error);
       return `Created task “${data.title}”.`;
     }
 
@@ -262,7 +321,7 @@ export async function executeAction(
         .eq('id', task_id)
         .select('id, title')
         .single();
-      if (error) throw new Error(error.message);
+      if (error) throw friendlyError(error);
       return `Updated task “${data.title}”.`;
     }
 
@@ -273,7 +332,7 @@ export async function executeAction(
         .insert(p)
         .select('id, title')
         .single();
-      if (error) throw new Error(error.message);
+      if (error) throw friendlyError(error);
       return `Created project “${data.title}”.`;
     }
 
@@ -285,7 +344,7 @@ export async function executeAction(
         .eq('id', project_id)
         .select('id, title')
         .single();
-      if (error) throw new Error(error.message);
+      if (error) throw friendlyError(error);
       return `Updated project “${data.title}”.`;
     }
 
@@ -296,7 +355,7 @@ export async function executeAction(
         .insert(p)
         .select('id, name')
         .single();
-      if (error) throw new Error(error.message);
+      if (error) throw friendlyError(error);
       return `Added client “${data.name}”.`;
     }
 
@@ -308,29 +367,21 @@ export async function executeAction(
         .eq('id', client_id)
         .select('id, name')
         .single();
-      if (error) throw new Error(error.message);
+      if (error) throw friendlyError(error);
       return `Updated client “${data.name}”.`;
     }
 
     case 'create_quote': {
       const { line_items, ...quote } = parsed.data as ActionParams<'create_quote'>;
       // Totals are computed HERE, server-side — never taken from the model.
-      const items = line_items.map((item, i) => ({
-        label: item.label,
-        quantity: item.quantity,
-        unit: item.unit ?? null,
-        rate: item.rate,
-        amount: Math.round(item.quantity * item.rate * 100) / 100,
-        position: i,
-      }));
-      const subtotal = Math.round(items.reduce((s, it) => s + it.amount, 0) * 100) / 100;
+      const { items, subtotal } = computeQuoteLineItems(line_items);
 
       const { data: created, error } = await supabase
         .from('quotes')
         .insert({ ...quote, status: 'draft', subtotal, total: subtotal })
         .select('id, title')
         .single();
-      if (error) throw new Error(error.message);
+      if (error) throw friendlyError(error);
 
       const { error: itemsError } = await supabase
         .from('quote_line_items')
@@ -338,7 +389,7 @@ export async function executeAction(
       if (itemsError) {
         // Don't leave a half-made quote behind if the line items failed.
         await supabase.from('quotes').delete().eq('id', created.id);
-        throw new Error(itemsError.message);
+        throw friendlyError(itemsError);
       }
       return `Saved draft quote “${created.title}” — $${subtotal.toLocaleString()}.`;
     }
