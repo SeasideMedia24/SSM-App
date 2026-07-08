@@ -42,6 +42,7 @@ const MAX_TOOL_ROUNDS = 8;
 
 // Friendly labels for the lookup chips.
 const LOOKUP_LABELS: Record<string, string> = {
+  get_briefing: 'Reviewed what needs attention',
   list_clients: 'Checked clients',
   list_projects: 'Checked projects',
   list_tasks: 'Checked tasks',

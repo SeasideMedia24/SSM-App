@@ -20,6 +20,7 @@ import type {
   QuoteStatus,
 } from '@/types/database.types';
 import { actionSchemas, type ActionName, isActionName } from './actions';
+import { getBriefing } from './briefing';
 
 type DB = SupabaseClient<Database>;
 
@@ -42,6 +43,12 @@ const QUOTE_STATUSES: readonly QuoteStatus[] = ['draft', 'sent', 'accepted', 'de
 // *when* to call each one — recent models reach for tools more deliberately, so
 // the trigger conditions matter.
 export const paepaeTools: Anthropic.Tool[] = [
+  {
+    name: 'get_briefing',
+    description:
+      "Get one snapshot of what needs attention right now: overdue tasks, tasks due in the next 7 days, the active project pipeline (count per stage), and quotes needing attention (drafts not yet sent, and quotes sent but awaiting a reply). Call this FIRST — a single call — whenever Jeremy asks for a summary, a digest, a daily or weekly rundown, 'what needs my attention', or 'what's going on', instead of stitching together list_tasks/list_projects/list_quotes yourself.",
+    input_schema: { type: 'object', properties: {}, additionalProperties: false },
+  },
   {
     name: 'list_clients',
     description:
@@ -157,6 +164,12 @@ type ToolInput = Record<string, unknown>;
 // is_error tool_result so PaePae can recover gracefully.
 export async function runTool(name: string, input: ToolInput, supabase: DB): Promise<string> {
   switch (name) {
+    case 'get_briefing': {
+      const today = new Date().toISOString().slice(0, 10);
+      const briefing = await getBriefing(supabase, today);
+      return JSON.stringify(briefing);
+    }
+
     case 'list_clients': {
       const { data, error } = await supabase
         .from('clients')

@@ -49,8 +49,8 @@ const ACTION_TITLES: Record<string, string> = {
 
 // Starter prompts for the empty state — tuned to what PaePae can actually do.
 const SUGGESTIONS = [
-  'What needs my attention this week?',
-  'Mark my overdue tasks done if I describe them to you.',
+  'Give me today’s digest — what needs my attention?',
+  'Which quotes are still waiting on a client reply?',
   'Draft a follow-up email for a client with a pending quote.',
   'Create a task list for an upcoming shoot.',
 ];
