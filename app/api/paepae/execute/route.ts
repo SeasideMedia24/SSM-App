@@ -37,7 +37,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { action, params } = (body ?? {}) as { action?: unknown; params?: unknown };
+  const { action, params, summary } = (body ?? {}) as {
+    action?: unknown;
+    params?: unknown;
+    summary?: unknown;
+  };
   if (!isActionName(action)) {
     return NextResponse.json({ ok: false, error: 'Unknown action' }, { status: 400 });
   }
@@ -46,6 +50,17 @@ export async function POST(req: NextRequest) {
     // executeAction re-validates params internally before touching the DB.
     const message = await executeAction(action, params, supabase);
     for (const path of pathsToRevalidate(action)) revalidatePath(path);
+
+    // Log the confirmed action so the dashboard can show what PaePae did. The
+    // summary is the card's display lines (bounded); best-effort — a logging
+    // failure must never fail the action the user already approved.
+    const summaryLines = Array.isArray(summary)
+      ? summary.filter((s): s is string => typeof s === 'string').slice(0, 40).map((s) => s.slice(0, 300))
+      : [];
+    await supabase
+      .from('paepae_actions')
+      .insert({ user_id: user.id, action, summary: summaryLines, result: message });
+
     return NextResponse.json({ ok: true, message });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'The action failed.';

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
 import { proj, type ProjRel } from '@/components/projects/global-table';
+import { PaepaeActivity, type PaepaeAction } from '@/components/dashboard/paepae-activity';
 import { fmtDate, money } from '@/lib/projects/format';
 import { quoteStatusMeta } from '@/lib/projects/status';
 import type { QuoteStatus } from '@/types/database.types';
@@ -9,6 +10,7 @@ import type { QuoteStatus } from '@/types/database.types';
 export default async function DashboardPage() {
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
+  const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
 
   const [
     { data: overdueTasks },
@@ -16,17 +18,22 @@ export default async function DashboardPage() {
     { data: upcoming },
     { count: activeProjects },
     { data: recentQuotes },
+    { data: paepaeActions },
   ] = await Promise.all([
     supabase.from('tasks').select('id, title, due_date, projects(id, title)').lt('due_date', today).neq('status', 'done').order('due_date'),
     supabase.from('deliverables').select('id, title, due_date, projects(id, title)').lt('due_date', today).neq('status', 'done').order('due_date'),
     supabase.from('milestones').select('id, title, date, projects(id, title)').gte('date', today).order('date').limit(8),
     supabase.from('projects').select('id', { count: 'exact', head: true }).neq('status', 'archived'),
     supabase.from('quotes').select('id, title, status, total, clients ( name )').order('created_at', { ascending: false }).limit(5),
+    // PaePae's recent confirmed actions. Tolerant of the table not existing yet
+    // (before the migration is applied) — the query just returns an error we ignore.
+    supabase.from('paepae_actions').select('id, action, summary, result, created_at').gte('created_at', fiveDaysAgo).order('created_at', { ascending: false }).limit(20),
   ]);
 
   const oTasks = overdueTasks ?? [];
   const oDeliv = overdueDeliverables ?? [];
   const up = upcoming ?? [];
+  const paepaeLog = (paepaeActions ?? []) as PaepaeAction[];
 
   return (
     <>
@@ -59,6 +66,10 @@ export default async function DashboardPage() {
               {up.map((m) => <FlagRow key={m.id} label={m.title} kind="Milestone" date={m.date} rel={m.projects as ProjRel} view="timeline" />)}
             </ul>
           )}
+        </Panel>
+
+        <Panel title="PaePae · last 5 days">
+          <PaepaeActivity actions={paepaeLog} />
         </Panel>
 
         <Panel title="Recent quotes">

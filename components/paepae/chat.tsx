@@ -162,7 +162,11 @@ export function PaePaeChat() {
       const res = await fetch('/api/paepae/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: part.proposal.action, params: part.proposal.params }),
+        body: JSON.stringify({
+          action: part.proposal.action,
+          params: part.proposal.params,
+          summary: part.proposal.summary,
+        }),
       });
       if (res.redirected || res.headers.get('content-type')?.includes('text/html')) {
         setProposal(mi, pi, { state: 'error', result: 'You’ve been signed out. Refresh and log in, then ask PaePae again.' });
