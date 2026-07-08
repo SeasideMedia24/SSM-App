@@ -10,6 +10,7 @@
 // gate in the UI.
 
 import 'server-only';
+import { z } from 'zod';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
@@ -18,6 +19,7 @@ import type {
   TaskStatus,
   QuoteStatus,
 } from '@/types/database.types';
+import { actionSchemas, type ActionName, isActionName } from './actions';
 
 type DB = SupabaseClient<Database>;
 
@@ -97,6 +99,56 @@ export const paepaeTools: Anthropic.Tool[] = [
     },
   },
 ];
+
+// ── Propose tools (write powers, gated) ─────────────────────────────────────
+// One propose_* tool per action in lib/paepae/actions.ts. Calling one of these
+// does NOT change anything — the route validates the input, shows the user a
+// confirmation card, and only /api/paepae/execute (after an explicit Confirm
+// click) ever writes. Input schemas are generated from the same zod schemas
+// that validate execution, so the two can never drift apart.
+
+const PROPOSE_PREFIX = 'propose_';
+
+// When each write tool should be reached for — shown to the model.
+const proposeDescriptions: Record<ActionName, string> = {
+  create_task:
+    'Propose creating a task in a project. Look up the project first (list_projects) to get its id. The user will see a confirmation card and must approve before anything is created.',
+  update_task:
+    'Propose changing an existing task (title, description, status, priority, due date — including marking it done). Look the task up first (list_tasks) to get its id. Requires user confirmation.',
+  create_project:
+    'Propose creating a new project for a client. Look up the client first (list_clients) to get its id. Requires user confirmation.',
+  update_project:
+    'Propose changing an existing project (title, status, priority, dates, type). Look the project up first (list_projects) to get its id. Requires user confirmation.',
+  create_client:
+    'Propose adding a new client record (name, company, contact details, notes, type). Requires user confirmation.',
+  update_client:
+    'Propose updating an existing client record. Look the client up first (list_clients) to get its id. Requires user confirmation.',
+  create_quote:
+    'Propose saving a DRAFT quote for a client, with line items (label, quantity, unit, rate). Totals are computed server-side. Use list_quotes/list_clients first for context; check rate presets with the user if unsure of pricing. Requires user confirmation.',
+};
+
+// Build the Anthropic tool definitions from the zod schemas.
+export const proposeTools: Anthropic.Tool[] = (
+  Object.keys(actionSchemas) as ActionName[]
+).map((action) => {
+  const schema = z.toJSONSchema(actionSchemas[action]) as Record<string, unknown>;
+  delete schema.$schema; // Anthropic wants a bare JSON schema object
+  return {
+    name: `${PROPOSE_PREFIX}${action}`,
+    description: proposeDescriptions[action],
+    input_schema: schema as Anthropic.Tool['input_schema'],
+  };
+});
+
+// Everything PaePae gets: read tools + gated propose tools.
+export const allPaepaeTools: Anthropic.Tool[] = [...paepaeTools, ...proposeTools];
+
+// "propose_create_task" -> "create_task"; null for anything else.
+export function actionFromToolName(toolName: string): ActionName | null {
+  if (!toolName.startsWith(PROPOSE_PREFIX)) return null;
+  const action = toolName.slice(PROPOSE_PREFIX.length);
+  return isActionName(action) ? action : null;
+}
 
 type ToolInput = Record<string, unknown>;
 

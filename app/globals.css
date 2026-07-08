@@ -82,3 +82,46 @@ body {
   background-clip: text;
   color: transparent;
 }
+
+/* PaePae chat: readable markdown inside assistant bubbles. Scoped to .paepae-md
+   so it can't restyle the rest of the app. */
+.paepae-md > :first-child { margin-top: 0; }
+.paepae-md > :last-child { margin-bottom: 0; }
+.paepae-md p { margin: 0.5rem 0; }
+.paepae-md h1, .paepae-md h2, .paepae-md h3, .paepae-md h4 {
+  margin: 0.75rem 0 0.35rem;
+  font-weight: 600;
+  color: var(--color-ink, #0b1f33);
+}
+.paepae-md h1 { font-size: 1.05rem; }
+.paepae-md h2 { font-size: 1rem; }
+.paepae-md h3, .paepae-md h4 { font-size: 0.95rem; }
+.paepae-md ul { list-style: disc; padding-left: 1.25rem; margin: 0.5rem 0; }
+.paepae-md ol { list-style: decimal; padding-left: 1.25rem; margin: 0.5rem 0; }
+.paepae-md li { margin: 0.2rem 0; }
+.paepae-md strong { font-weight: 600; }
+.paepae-md a { color: #1c687d; text-decoration: underline; }
+.paepae-md code {
+  background: #eef2f6;
+  border-radius: 0.3rem;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.85em;
+}
+.paepae-md pre {
+  background: #0b1f33;
+  color: #e8eef4;
+  border-radius: 0.6rem;
+  padding: 0.75rem;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+}
+.paepae-md pre code { background: transparent; padding: 0; color: inherit; }
+.paepae-md blockquote {
+  border-left: 3px solid #78d6d0;
+  padding-left: 0.75rem;
+  color: #475569;
+  margin: 0.5rem 0;
+}
+.paepae-md table { border-collapse: collapse; margin: 0.5rem 0; font-size: 0.85rem; }
+.paepae-md th, .paepae-md td { border: 1px solid #e2e8f0; padding: 0.3rem 0.6rem; }
+.paepae-md th { background: #f8fafc; font-weight: 600; }

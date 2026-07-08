@@ -1,9 +1,16 @@
-// PaePae chat endpoint (Phase 2, slice 1).
+// PaePae chat endpoint (Phase 2, slice 2: draft & do).
 //
 // This is the ONLY place the Anthropic key is used. The browser posts the
-// conversation here; we run the tool loop server-side and stream PaePae's reply
-// back as plain text. Auth + RLS are enforced: the same Supabase server client
-// the rest of the app uses scopes every tool read to the signed-in user.
+// conversation here; we run the tool loop server-side and stream back
+// newline-delimited JSON events the chat UI renders in order:
+//
+//   {"t":"text","d":"…"}                 — a chunk of PaePae's reply
+//   {"t":"lookup","label":"…"}           — PaePae read something (chip in UI)
+//   {"t":"proposal","proposal":{…}}      — a gated write for the user to Confirm
+//   {"t":"error","message":"…"}          — something went wrong
+//
+// Proposals do NOT write anything. The Confirm button posts them to
+// /api/paepae/execute, which re-validates and executes. Auth + RLS throughout.
 
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
@@ -11,7 +18,8 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@/lib/supabase/server';
 import { getAnthropic, PAEPAE_MODEL } from '@/lib/paepae/client';
 import { paepaeSystemPrompt } from '@/lib/paepae/system';
-import { paepaeTools, runTool } from '@/lib/paepae/tools';
+import { allPaepaeTools, runTool, actionFromToolName } from '@/lib/paepae/tools';
+import { validateAction, describeAction, type Proposal } from '@/lib/paepae/actions';
 
 export const runtime = 'nodejs';
 
@@ -26,12 +34,19 @@ const bodySchema = z.object({
       }),
     )
     .min(1)
-    .max(50),
+    .max(60),
 });
 
-// Safety cap on how many times PaePae may call tools before answering, so a loop
-// can never run away.
-const MAX_TOOL_ROUNDS = 6;
+// Safety cap on tool rounds per request, so a loop can never run away.
+const MAX_TOOL_ROUNDS = 8;
+
+// Friendly labels for the lookup chips.
+const LOOKUP_LABELS: Record<string, string> = {
+  list_clients: 'Checked clients',
+  list_projects: 'Checked projects',
+  list_tasks: 'Checked tasks',
+  list_quotes: 'Checked quotes',
+};
 
 export async function POST(req: NextRequest) {
   // 1. Auth — must be signed in (defense in depth alongside the proxy/middleware).
@@ -67,10 +82,13 @@ export async function POST(req: NextRequest) {
   }));
   const system = paepaeSystemPrompt(today);
 
-  // 4. Stream the reply. We run the tool loop and forward text deltas as they come.
+  // 4. Stream NDJSON events while running the tool loop server-side.
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      const emit = (event: Record<string, unknown>) =>
+        controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'));
+
       try {
         for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
           const ms = anthropic.messages.stream({
@@ -78,46 +96,70 @@ export async function POST(req: NextRequest) {
             max_tokens: 12000,
             system,
             thinking: { type: 'adaptive' },
-            tools: paepaeTools,
+            tools: allPaepaeTools,
             messages,
           });
 
           // Forward visible text to the browser as it's generated.
-          ms.on('text', (delta) => controller.enqueue(encoder.encode(delta)));
+          ms.on('text', (delta) => emit({ t: 'text', d: delta }));
 
           const final = await ms.finalMessage();
           // Echo the full assistant turn (incl. thinking + tool_use blocks) back
-          // into history so a follow-up tool round stays coherent on the same model.
+          // into history so follow-up tool rounds stay coherent on the same model.
           messages.push({ role: 'assistant', content: final.content });
 
           if (final.stop_reason !== 'tool_use') break;
 
-          // Execute each requested read tool and feed results back.
           const toolResults: Anthropic.ToolResultBlockParam[] = [];
           for (const block of final.content) {
             if (block.type !== 'tool_use') continue;
-            try {
-              const out = await runTool(
-                block.name,
-                block.input as Record<string, unknown>,
-                supabase,
-              );
-              toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: out });
-            } catch (err) {
-              const message = err instanceof Error ? err.message : 'lookup failed';
+            const input = block.input as Record<string, unknown>;
+            const action = actionFromToolName(block.name);
+
+            if (action) {
+              // A gated write: validate, show the card, and make it crystal
+              // clear to the model that nothing has run yet.
+              const checked = validateAction(action, input);
+              if (!checked.ok) {
+                toolResults.push({
+                  type: 'tool_result',
+                  tool_use_id: block.id,
+                  content: `Invalid proposal: ${checked.error}`,
+                  is_error: true,
+                });
+                continue;
+              }
+              const summary = await describeAction(action, checked.params, supabase);
+              const proposal: Proposal = { action, params: checked.params, summary };
+              emit({ t: 'proposal', proposal });
               toolResults.push({
                 type: 'tool_result',
                 tool_use_id: block.id,
-                content: `Error: ${message}`,
-                is_error: true,
+                content:
+                  'Proposal card shown to the user. It has NOT been executed — the user must click Confirm. Briefly note what you proposed and wait; never claim it is done.',
               });
+            } else {
+              // A read tool.
+              emit({ t: 'lookup', label: LOOKUP_LABELS[block.name] ?? `Ran ${block.name}` });
+              try {
+                const out = await runTool(block.name, input, supabase);
+                toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: out });
+              } catch (err) {
+                const message = err instanceof Error ? err.message : 'lookup failed';
+                toolResults.push({
+                  type: 'tool_result',
+                  tool_use_id: block.id,
+                  content: `Error: ${message}`,
+                  is_error: true,
+                });
+              }
             }
           }
           messages.push({ role: 'user', content: toolResults });
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'unknown error';
-        controller.enqueue(encoder.encode(`\n\n⚠️ PaePae hit a problem: ${message}`));
+        emit({ t: 'error', message });
       } finally {
         controller.close();
       }
@@ -126,7 +168,8 @@ export async function POST(req: NextRequest) {
 
   return new Response(stream, {
     headers: {
-      'Content-Type': 'text/plain; charset=utf-8',
+      // NDJSON — one JSON event per line.
+      'Content-Type': 'application/x-ndjson; charset=utf-8',
       'Cache-Control': 'no-store',
     },
   });
