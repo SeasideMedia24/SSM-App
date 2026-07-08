@@ -11,7 +11,7 @@
 // Overlays are pointer-events-none and unmount once finished, so they never
 // block interaction. Opacity/transform/clip-path keep it GPU-friendly.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 
 type Effect = 'wipe' | 'iris' | 'split' | 'curtain' | 'dissolve';
@@ -22,17 +22,20 @@ const EASE = [0.76, 0, 0.24, 1] as const;
 export function PageTransition({ children }: { children: React.ReactNode }) {
   const [done, setDone] = useState(false);
 
-  // Overlays are `absolute`, so they cover only the white content area (their
+  // Safety net: guarantee the overlay clears even if its fade animation stalls
+  // (e.g. a throttled/backgrounded tab where requestAnimationFrame pauses). The
+  // content itself is ALWAYS visible underneath — only the overlay animates — so
+  // a stalled animation can never leave the page hidden.
+  useEffect(() => {
+    const t = setTimeout(() => setDone(true), 700);
+    return () => clearTimeout(t);
+  }, []);
+
+  // The overlay is `absolute`, so it covers only the white content area (its
   // positioned ancestor is <main>) — the sidebar stays put during transitions.
   return (
     <>
-      <motion.div
-        initial={{ opacity: 0, y: 16, filter: 'blur(10px)' }}
-        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-        transition={{ duration: 0.5, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
-      >
-        {children}
-      </motion.div>
+      {children}
       {!done && <Overlay effect={EFFECT} onDone={() => setDone(true)} />}
     </>
   );

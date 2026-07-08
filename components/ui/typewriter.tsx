@@ -42,9 +42,15 @@ export function Typewriter({
       setN(i);
       if (i < text.length) tick = setTimeout(step, perChar);
     }, startDelay);
+    // Safety net: if the per-character chain stalls (e.g. a throttled/backgrounded
+    // tab where timers are clamped), reveal the full text after a hard deadline so
+    // a heading is never left cut off.
+    const deadline = Math.min(startDelay + text.length * perChar + 500, 2500);
+    const safety = setTimeout(() => setN(text.length), deadline);
     return () => {
       clearTimeout(startTimer);
       clearTimeout(tick);
+      clearTimeout(safety);
     };
   }, [text, perChar, startDelay]);
 
