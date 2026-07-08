@@ -15,7 +15,6 @@ type NavItem = { href: string; label: string; icon: React.ReactNode; children?: 
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: <IconGrid /> },
-  { href: '/paepae', label: 'PaePae', icon: <IconSpark /> },
   { href: '/clients', label: 'Clients', icon: <IconUsers /> },
   { href: '/inquiries', label: 'Inquiries', icon: <IconInbox /> },
   {
@@ -67,6 +66,17 @@ export function Sidebar({ userEmail }: { userEmail: string }) {
           ),
         )}
       </nav>
+
+      {/* PaePae is pinned to the bottom of the menu — the assistant is always
+          one click away, sitting just above the account footer. */}
+      <div className="px-3 pb-2 pt-1">
+        <NavLink
+          href="/paepae"
+          icon={<IconSpark />}
+          label="PaePae"
+          active={pathname === '/paepae' || pathname.startsWith('/paepae/')}
+        />
+      </div>
 
       <div className="border-t border-white/10 px-5 py-4">
         <p className="mb-2 truncate text-xs text-white/50" title={userEmail}>{userEmail}</p>

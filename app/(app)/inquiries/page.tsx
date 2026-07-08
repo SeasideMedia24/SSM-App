@@ -107,17 +107,31 @@ export default async function InquiriesPage() {
             {/* Mini bar chart: intakes per month, last 6 months */}
             <div className="col-span-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-1">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Last 6 months</p>
-              <div className="mt-2 flex items-end gap-1.5">
-                {months.map((m) => (
-                  <div key={m.label} className="flex flex-1 flex-col items-center gap-1" title={`${m.label}: ${m.count}`}>
-                    {/* Bar height in px (max 44) so it renders without a fixed-height parent. */}
-                    <div
-                      className={`w-full rounded-t ${m.count > 0 ? 'bg-teal' : 'bg-slate-100'}`}
-                      style={{ height: `${Math.max(4, Math.round((m.count / maxMonth) * 44))}px` }}
-                    />
-                    <span className="text-[9px] text-slate-400">{m.label}</span>
+              <div className="mt-2 flex gap-1.5">
+                {/* Y axis: number scale aligned to the 44px bar zone (max, mid, 0). */}
+                <div className="flex h-11 flex-col justify-between text-right text-[9px] leading-none text-slate-400">
+                  <span>{maxMonth}</span>
+                  {maxMonth > 1 && <span>{Math.round(maxMonth / 2)}</span>}
+                  <span>0</span>
+                </div>
+                <div className="flex flex-1 flex-col">
+                  <div className="flex h-11 items-end gap-1.5">
+                    {months.map((m) => (
+                      <div key={m.label} className="flex flex-1 items-end" title={`${m.label}: ${m.count}`}>
+                        {/* Bar height in px (max 44) so it renders without a fixed-height parent. */}
+                        <div
+                          className={`w-full rounded-t ${m.count > 0 ? 'bg-teal' : 'bg-slate-100'}`}
+                          style={{ height: `${Math.max(4, Math.round((m.count / maxMonth) * 44))}px` }}
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
+                  <div className="mt-1 flex gap-1.5">
+                    {months.map((m) => (
+                      <span key={m.label} className="flex-1 text-center text-[9px] text-slate-400">{m.label}</span>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

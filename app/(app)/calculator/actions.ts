@@ -50,10 +50,9 @@ export async function saveQuote(_prev: QuoteFormState, formData: FormData): Prom
   }
   const config: PricingConfig = Object.fromEntries(configRows.map((c) => [c.key, c.value]));
 
+  // An empty quote is allowed — it saves as a $0 placeholder the owner can fill
+  // in later. Line items are only inserted when there are selections (below).
   const q = computeQuote(d.selections, roles, services, config);
-  if (q.lines.length === 0) {
-    return { error: 'Nothing is selected yet — pick at least one crew role or service.' };
-  }
 
   // Note the applied discounts on the quote so they're visible later.
   let notes = emptyToNull(d.notes);
@@ -87,10 +86,13 @@ export async function saveQuote(_prev: QuoteFormState, formData: FormData): Prom
     quoteId = data.id;
   }
 
-  const { error: itemsError } = await supabase
-    .from('quote_line_items')
-    .insert(q.lines.map((line, i) => ({ ...line, quote_id: quoteId, position: i })));
-  if (itemsError) return { error: 'The quote saved but its line items failed. Please reopen and try again.' };
+  // Only insert line items when there are selections; an empty quote has none.
+  if (q.lines.length > 0) {
+    const { error: itemsError } = await supabase
+      .from('quote_line_items')
+      .insert(q.lines.map((line, i) => ({ ...line, quote_id: quoteId, position: i })));
+    if (itemsError) return { error: 'The quote saved but its line items failed. Please reopen and try again.' };
+  }
 
   revalidatePath('/calculator');
   revalidatePath('/dashboard');

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
+import { CollapsibleTaskSection } from '@/components/tasks/collapsible-section';
 import { TASK_STATUSES, taskPriorityMeta } from '@/lib/projects/status';
 import type { TaskStatus, TaskPriority } from '@/types/database.types';
 
@@ -41,11 +42,14 @@ export default async function MyTasksPage() {
             const items = list.filter((t) => (t.status as TaskStatus) === col.value);
             if (items.length === 0) return null;
             return (
-              <div key={col.value}>
-                <div className="mb-2 flex items-center gap-2">
-                  <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${col.pill}`}>{col.label}</span>
-                  <span className="text-xs text-slate-400">{items.length}</span>
-                </div>
+              // "Done" starts folded so finished work stays out of the way.
+              <CollapsibleTaskSection
+                key={col.value}
+                label={col.label}
+                pill={col.pill}
+                count={items.length}
+                defaultOpen={col.value !== 'done'}
+              >
                 <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
                   {items.map((t) => {
                     const proj = project(t.projects as ProjectRel);
@@ -67,7 +71,7 @@ export default async function MyTasksPage() {
                     );
                   })}
                 </ul>
-              </div>
+              </CollapsibleTaskSection>
             );
           })}
         </div>
