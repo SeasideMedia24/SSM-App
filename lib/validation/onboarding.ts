@@ -19,6 +19,29 @@ export const onboardingSchema = z.object({
 
 export type OnboardingInput = z.infer<typeof onboardingSchema>;
 
+// Onboarding must NEVER overwrite a client's existing identity. A wrong or
+// reused invite link (see the Jared/Paige incident) must be unable to erase an
+// established client, so completing an invite only fills in blank fields and
+// keeps whatever the record already has.
+export type ClientIdentity = {
+  name: string | null;
+  company: string | null;
+  email: string | null;
+  phone: string | null;
+};
+
+const keepIfSet = (current: string | null, incoming: string | null): string | null =>
+  current && current.trim() !== '' ? current : incoming;
+
+export function fillBlankIdentity(existing: ClientIdentity, incoming: ClientIdentity): ClientIdentity {
+  return {
+    name: keepIfSet(existing.name, incoming.name),
+    company: keepIfSet(existing.company, incoming.company),
+    email: keepIfSet(existing.email, incoming.email),
+    phone: keepIfSet(existing.phone, incoming.phone),
+  };
+}
+
 // Budget ranges offered on the form (kept simple; owner can refine later).
 export const BUDGET_RANGES = [
   'Under $2,500',

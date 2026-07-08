@@ -6,7 +6,7 @@
 //   4. create a draft project (+ template rows)  5. draft contract  6. record the submission.
 
 import { createAdminClient } from '@/lib/supabase/admin';
-import { onboardingSchema } from '@/lib/validation/onboarding';
+import { onboardingSchema, fillBlankIdentity } from '@/lib/validation/onboarding';
 import { PROJECT_TYPES, projectTypeLabel, templateRows } from '@/lib/projects/template';
 
 export type OnboardState = { ok: boolean; error: string | null };
@@ -47,16 +47,34 @@ export async function submitOnboarding(_prev: OnboardState, formData: FormData):
     // 3. Resolve the client — update the invited one, or create a new lead.
     let clientId: string;
     if (token) {
-      const { data: existing } = await admin.from('clients').select('id').eq('onboard_token', token).single();
+      const { data: existing } = await admin
+        .from('clients')
+        .select('id, name, company, email, phone, onboarded_at')
+        .eq('onboard_token', token)
+        .single();
       if (!existing) return { ok: false, error: 'This invite link is no longer valid.' };
+      // Safety net (see the Jared/Paige incident): a completed invite must never
+      // erase an existing client. Reject a link for a client that already
+      // onboarded, and only ever FILL BLANK fields — never overwrite details the
+      // record already holds. A wrong or reused link can no longer replace a
+      // client's identity.
+      if (existing.onboarded_at) {
+        return { ok: false, error: 'This invite link has already been used. Please contact us for a new one.' };
+      }
       clientId = existing.id;
+      const merged = fillBlankIdentity(existing, {
+        name: d.name.trim(),
+        company: clean(d.company),
+        email: clean(d.email),
+        phone: clean(d.phone),
+      });
       await admin
         .from('clients')
         .update({
-          name: d.name.trim(),
-          company: clean(d.company),
-          email: clean(d.email),
-          phone: clean(d.phone),
+          name: merged.name ?? d.name.trim(), // name is required; never null in practice
+          company: merged.company,
+          email: merged.email,
+          phone: merged.phone,
           onboarded_at: new Date().toISOString(),
           onboard_token: null, // single-use
         })
