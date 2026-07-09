@@ -2,11 +2,12 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
 import { CollapsibleTaskSection } from '@/components/tasks/collapsible-section';
+import { NewTaskForm } from '@/components/tasks/new-task-form';
 import { TASK_STATUSES, taskPriorityMeta } from '@/lib/projects/status';
 import type { TaskStatus, TaskPriority } from '@/types/database.types';
 
-type ProjectRel = { id: string; title: string } | { id: string; title: string }[] | null;
-function project(p: ProjectRel): { id: string; title: string } | null {
+type Rel = { id: string; title?: string; name?: string } | { id: string; title?: string; name?: string }[] | null;
+function one(p: Rel): { id: string; title?: string; name?: string } | null {
   if (!p) return null;
   return Array.isArray(p) ? (p[0] ?? null) : p;
 }
@@ -20,21 +21,31 @@ export default async function MyTasksPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: tasks } = await supabase
-    .from('tasks')
-    .select('id, title, status, priority, due_date, projects(id, title)')
-    .eq('assignee_id', user?.id ?? '')
-    .order('due_date', { ascending: true, nullsFirst: false });
+  // Tasks assigned to me, plus the projects and clients that back the "new task"
+  // form's pickers.
+  const [{ data: tasks }, { data: projects }, { data: clients }] = await Promise.all([
+    supabase
+      .from('tasks')
+      .select('id, title, status, priority, due_date, projects(id, title), clients(id, name)')
+      .eq('assignee_id', user?.id ?? '')
+      .order('due_date', { ascending: true, nullsFirst: false }),
+    supabase.from('projects').select('id, title').neq('status', 'archived').order('title'),
+    supabase.from('clients').select('id, name').order('name'),
+  ]);
 
   const list = tasks ?? [];
+  const projectOptions = (projects ?? []).map((p) => ({ id: p.id, label: p.title }));
+  const clientOptions = (clients ?? []).map((c) => ({ id: c.id, label: c.name }));
 
   return (
     <>
-      <PageHeader title="My Tasks" description="Everything assigned to you, across every project." />
+      <PageHeader title="My Tasks" description="Everything assigned to you — attach a task to a project, a client, or neither." />
+
+      <NewTaskForm projects={projectOptions} clients={clientOptions} />
 
       {list.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 px-6 py-14 text-center">
-          <p className="text-sm text-slate-500">No tasks assigned to you yet.</p>
+          <p className="text-sm text-slate-500">No tasks yet. Add one above.</p>
         </div>
       ) : (
         <div className="space-y-5">
@@ -52,7 +63,8 @@ export default async function MyTasksPage() {
               >
                 <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
                   {items.map((t) => {
-                    const proj = project(t.projects as ProjectRel);
+                    const proj = one(t.projects as Rel);
+                    const client = one(t.clients as Rel);
                     const prio = taskPriorityMeta(t.priority as TaskPriority);
                     const due = fmtDue(t.due_date);
                     return (
@@ -60,11 +72,15 @@ export default async function MyTasksPage() {
                         <span className={`text-sm ${t.status === 'done' ? 'text-slate-400 line-through' : 'text-ink'}`}>
                           {t.title}
                         </span>
-                        {proj && (
+                        {proj ? (
                           <Link href={`/projects/${proj.id}?view=tasks`} className="text-xs text-slate-500 hover:text-sea hover:underline">
                             {proj.title}
                           </Link>
-                        )}
+                        ) : client ? (
+                          <Link href={`/clients/${client.id}`} className="text-xs text-slate-500 hover:text-sea hover:underline">
+                            {client.name}
+                          </Link>
+                        ) : null}
                         <span className={`ml-auto rounded-full px-2 py-0.5 text-[11px] ${prio.pill}`}>{prio.label}</span>
                         {due && <span className="text-[11px] text-slate-400">{due}</span>}
                       </li>

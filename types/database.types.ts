@@ -146,7 +146,8 @@ export type Database = {
       tasks: {
         Row: {
           id: string;
-          project_id: string;
+          project_id: string | null;
+          client_id: string | null;
           title: string;
           description: string | null;
           status: TaskStatus;
@@ -157,7 +158,8 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          project_id: string;
+          project_id?: string | null;
+          client_id?: string | null;
           title: string;
           description?: string | null;
           status?: TaskStatus;
@@ -168,7 +170,8 @@ export type Database = {
         };
         Update: {
           id?: string;
-          project_id?: string;
+          project_id?: string | null;
+          client_id?: string | null;
           title?: string;
           description?: string | null;
           status?: TaskStatus;
@@ -182,6 +185,12 @@ export type Database = {
             foreignKeyName: 'tasks_project_id_fkey';
             columns: ['project_id'];
             referencedRelation: 'projects';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'tasks_client_id_fkey';
+            columns: ['client_id'];
+            referencedRelation: 'clients';
             referencedColumns: ['id'];
           },
           {
