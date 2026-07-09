@@ -147,8 +147,8 @@ export default async function InquiriesPage() {
               <ul className="flex flex-col gap-2">
                 {needsAttention.map((s) => (
                   <li key={s.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-slate-900">
+                    <Link href={`/inquiries/${s.id}`} className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-slate-900 hover:text-sea hover:underline">
                         {s.name}
                         {s.company && <span className="font-normal text-slate-500"> · {s.company}</span>}
                       </p>
@@ -157,7 +157,7 @@ export default async function InquiriesPage() {
                         {s.budget_range && ` · ${s.budget_range}`}
                         {` · ${fmtDate(s.created_at)}`}
                       </p>
-                    </div>
+                    </Link>
                     {s.desired_timeline && (
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${timelinePill(s.desired_timeline)}`}>
                         {s.desired_timeline}
@@ -211,13 +211,9 @@ export default async function InquiriesPage() {
                     {activeSubs.map((s) => (
                       <tr key={s.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                         <td className="px-4 py-3">
-                          {s.client_id ? (
-                            <Link href={`/clients/${s.client_id}`} className="font-medium text-slate-900 hover:underline">
-                              {s.name}
-                            </Link>
-                          ) : (
-                            <span className="font-medium text-slate-900">{s.name}</span>
-                          )}
+                          <Link href={`/inquiries/${s.id}`} className="font-medium text-slate-900 hover:text-sea hover:underline">
+                            {s.name}
+                          </Link>
                           {s.company && <p className="text-xs text-slate-500">{s.company}</p>}
                         </td>
                         <td className="px-4 py-3 text-slate-600">{projectTypeLabel(s.project_type) ?? '—'}</td>
@@ -285,13 +281,9 @@ export default async function InquiriesPage() {
                     {archivedSubs.map((s) => (
                       <tr key={s.id} className="border-b border-slate-100 last:border-0 text-slate-500 hover:bg-slate-50">
                         <td className="px-4 py-3">
-                          {s.client_id ? (
-                            <Link href={`/clients/${s.client_id}`} className="font-medium text-slate-700 hover:underline">
-                              {s.name}
-                            </Link>
-                          ) : (
-                            <span className="font-medium text-slate-700">{s.name}</span>
-                          )}
+                          <Link href={`/inquiries/${s.id}`} className="font-medium text-slate-700 hover:text-sea hover:underline">
+                            {s.name}
+                          </Link>
                           {s.company && <p className="text-xs text-slate-400">{s.company}</p>}
                         </td>
                         <td className="px-4 py-3">{projectTypeLabel(s.project_type) ?? '—'}</td>
