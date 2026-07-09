@@ -6,10 +6,10 @@
 // pure engine the server uses (lib/pricing/engine.ts); on save the server
 // recomputes from database rates, so these numbers are display-only.
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { saveQuote, type QuoteFormState } from '@/app/(app)/calculator/actions';
+import { saveQuote, quickCreateClient, type QuoteFormState } from '@/app/(app)/calculator/actions';
 import {
   computeQuote, emptySelections, RENTAL_LABELS, DISCOUNT_LABELS,
   type CalculatorSelections, type RoleRates, type PageService, type PricingConfig,
@@ -57,6 +57,8 @@ export function ProductionCalculator({
 }) {
   const [state, action] = useActionState<QuoteFormState, FormData>(saveQuote, { error: null });
   const [clientId, setClientId] = useState(initial?.client_id ?? '');
+  // Clients are seeded from the server but can grow via quick-add below.
+  const [clientList, setClientList] = useState<ClientOption[]>(clients);
   const [s, setS] = useState<CalculatorSelections>(() => initial?.selections ?? emptySelections());
 
   const clientProjects = useMemo(() => projects.filter((p) => p.client_id === clientId), [projects, clientId]);
@@ -116,10 +118,16 @@ export function ProductionCalculator({
             <Labeled label="Client" required>
               <select name="client_id" required value={clientId} onChange={(e) => setClientId(e.target.value)} className={field}>
                 <option value="">Choose a client…</option>
-                {clients.map((c) => (
+                {clientList.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}{c.company ? ` — ${c.company}` : ''}</option>
                 ))}
               </select>
+              <QuickAddClient
+                onCreated={(c) => {
+                  setClientList((prev) => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)));
+                  setClientId(c.id);
+                }}
+              />
             </Labeled>
             <Labeled label="Project (optional)">
               <select name="project_id" defaultValue={initial?.project_id ?? ''} className={field} disabled={!clientId}>
@@ -298,6 +306,60 @@ export function ProductionCalculator({
         </div>
       </aside>
     </form>
+  );
+}
+
+// Quick-add a client without leaving the calculator. Not a nested <form> (we're
+// already inside the save form) — it calls the server action directly.
+function QuickAddClient({ onCreated }: { onCreated: (c: ClientOption) => void }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [company, setCompany] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="mt-1.5 self-start text-xs font-medium text-sea hover:underline">
+        + New client
+      </button>
+    );
+  }
+
+  function submit() {
+    setError(null);
+    start(async () => {
+      const res = await quickCreateClient({ name, company });
+      if (res.ok) {
+        onCreated(res.client);
+        setOpen(false);
+        setName('');
+        setCompany('');
+      } else {
+        setError(res.error);
+      }
+    });
+  }
+
+  return (
+    <div className="mt-2 flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Client name" className={field} aria-label="New client name" />
+      <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Company (optional)" className={field} aria-label="New client company" />
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          disabled={pending || !name.trim()}
+          onClick={submit}
+          className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-60"
+        >
+          {pending ? 'Adding…' : 'Add client'}
+        </button>
+        <button type="button" onClick={() => { setOpen(false); setError(null); }} className="text-xs text-slate-500 hover:text-slate-700">
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }
 

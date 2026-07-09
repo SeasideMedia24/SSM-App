@@ -100,6 +100,34 @@ export async function saveQuote(_prev: QuoteFormState, formData: FormData): Prom
   redirect('/calculator');
 }
 
+// Quick-add a client straight from the calculator, for when someone calls
+// before there's a quote. Returns the new row so the calculator can select it
+// without a full page reload. Validated server-side (CLAUDE.md rule #3).
+export async function quickCreateClient(input: {
+  name: string;
+  company?: string;
+}): Promise<
+  | { ok: true; client: { id: string; name: string; company: string | null } }
+  | { ok: false; error: string }
+> {
+  const name = (input?.name ?? '').trim();
+  if (!name) return { ok: false, error: 'Client name is required.' };
+  if (name.length > 200) return { ok: false, error: 'That name is too long.' };
+  const company = (input?.company ?? '').trim() || null;
+
+  const supabase = await createSupabaseServer();
+  const { data, error } = await supabase
+    .from('clients')
+    .insert({ name, company, client_type: 'one_time' })
+    .select('id, name, company')
+    .single();
+  if (error || !data) return { ok: false, error: 'Could not add the client. Please try again.' };
+
+  revalidatePath('/calculator');
+  revalidatePath('/clients');
+  return { ok: true, client: data };
+}
+
 // Flip a quote between draft / sent / accepted / declined.
 export async function setQuoteStatus(formData: FormData) {
   const id = String(formData.get('id') ?? '').trim();
