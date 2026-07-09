@@ -3,6 +3,7 @@ import { PageHeader } from '@/components/page-header';
 import { GlobalEmpty, proj, type ProjRel } from '@/components/projects/global-table';
 import { GroupedByProject } from '@/components/projects/grouped-view';
 import { groupByProject } from '@/lib/projects/grouping';
+import { setDeliverableStatus } from '@/app/(app)/projects/[id]/actions';
 
 export default async function AllDeliverablesPage() {
   const supabase = await createClient();
@@ -21,7 +22,7 @@ export default async function AllDeliverablesPage() {
       {groups.length === 0 ? (
         <GlobalEmpty>No deliverables yet. They’re created inside each project.</GlobalEmpty>
       ) : (
-        <GroupedByProject groups={groups} itemNoun="deliverable" projectView="deliverables" />
+        <GroupedByProject groups={groups} itemNoun="deliverable" projectView="deliverables" setStatus={setDeliverableStatus} />
       )}
     </>
   );
