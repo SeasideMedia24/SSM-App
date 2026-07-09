@@ -19,6 +19,7 @@ export type TaskPriority = 'low' | 'medium' | 'high';
 export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'declined';
 export type InvoiceStatus = 'draft' | 'sent' | 'paid';
 export type ClientType = 'recurring' | 'one_time' | 'campaign';
+export type ContractorType = 'internal' | 'external' | 'employee';
 export type ContractStatus = 'draft' | 'sent' | 'signed' | 'declined';
 export type PricingRoleKind = 'standard' | 'photographer' | 'drone';
 export type PricingPhase = 'pre' | 'post';
@@ -406,6 +407,101 @@ export type Database = {
             foreignKeyName: 'invoice_line_items_invoice_id_fkey';
             columns: ['invoice_id'];
             referencedRelation: 'invoices';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      contractors: {
+        Row: {
+          id: string;
+          name: string;
+          email: string | null;
+          phone: string | null;
+          type: ContractorType;
+          role: string | null;
+          default_rate: number | null;
+          rate_unit: string | null;
+          notes: string | null;
+          onboard_token: string | null;
+          user_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          email?: string | null;
+          phone?: string | null;
+          type?: ContractorType;
+          role?: string | null;
+          default_rate?: number | null;
+          rate_unit?: string | null;
+          notes?: string | null;
+          onboard_token?: string | null;
+          user_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          email?: string | null;
+          phone?: string | null;
+          type?: ContractorType;
+          role?: string | null;
+          default_rate?: number | null;
+          rate_unit?: string | null;
+          notes?: string | null;
+          onboard_token?: string | null;
+          user_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'contractors_user_id_fkey';
+            columns: ['user_id'];
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      project_contractors: {
+        Row: {
+          id: string;
+          project_id: string;
+          contractor_id: string;
+          role: string | null;
+          rate: number | null;
+          rate_unit: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          contractor_id: string;
+          role?: string | null;
+          rate?: number | null;
+          rate_unit?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          contractor_id?: string;
+          role?: string | null;
+          rate?: number | null;
+          rate_unit?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'project_contractors_project_id_fkey';
+            columns: ['project_id'];
+            referencedRelation: 'projects';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'project_contractors_contractor_id_fkey';
+            columns: ['contractor_id'];
+            referencedRelation: 'contractors';
             referencedColumns: ['id'];
           },
         ];
