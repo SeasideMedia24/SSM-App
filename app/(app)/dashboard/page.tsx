@@ -20,6 +20,7 @@ export default async function DashboardPage() {
     { data: upcoming },
     { data: activeProjects },
     { data: recentQuotes },
+    { data: overdueInvoices },
     { data: paepaeActions },
   ] = await Promise.all([
     supabase.from('tasks').select('id, title, due_date, projects(id, title)').lt('due_date', today).neq('status', 'done').order('due_date'),
@@ -27,6 +28,9 @@ export default async function DashboardPage() {
     supabase.from('milestones').select('id, title, date, projects(id, title)').gte('date', today).order('date').limit(8),
     supabase.from('projects').select('id, title, status, due_date').neq('status', 'archived').order('due_date', { nullsFirst: false }),
     supabase.from('quotes').select('id, title, status, total, clients ( name )').order('created_at', { ascending: false }).limit(5),
+    // Overdue invoices = sent and past due. Tolerant of the table not existing
+    // yet (pre-migration) — the error is ignored and treated as empty.
+    supabase.from('invoices').select('id, invoice_number, title, total, due_date, clients ( name )').eq('status', 'sent').lt('due_date', today).order('due_date'),
     // PaePae's recent confirmed actions. Tolerant of the table not existing yet
     // (before the migration is applied) — the query just returns an error we ignore.
     supabase.from('paepae_actions').select('id, action, summary, result, created_at').gte('created_at', fiveDaysAgo).order('created_at', { ascending: false }).limit(20),
@@ -52,11 +56,20 @@ export default async function DashboardPage() {
   const projectItems: MetricItem[] = projectsList.map((p) => ({
     id: p.id, label: p.title, href: `/projects/${p.id}`, kind: projectStatusMeta(p.status as ProjectStatus).label, date: fmtDate(p.due_date),
   }));
+  const invoiceList = overdueInvoices ?? [];
+  const invoiceItems: MetricItem[] = invoiceList.map((inv) => ({
+    id: inv.id,
+    label: `${inv.invoice_number ? `${inv.invoice_number} · ` : ''}${inv.title}`,
+    href: `/invoices/${inv.id}`,
+    kind: (inv.clients as unknown as { name: string } | null)?.name,
+    date: fmtDate(inv.due_date),
+  }));
 
   const metrics: MetricDef[] = [
     { key: 'projects', label: 'Active projects', value: projectsList.length, items: projectItems, emptyText: 'No active projects.' },
     { key: 'tasks', label: 'Overdue tasks', value: oTasks.length, tone: 'warn', items: taskItems, emptyText: 'Nothing overdue. Nice.' },
     { key: 'deliverables', label: 'Overdue deliverables', value: oDeliv.length, tone: 'warn', items: delivItems, emptyText: 'No overdue deliverables.' },
+    { key: 'invoices', label: 'Overdue invoices', value: invoiceList.length, tone: 'warn', items: invoiceItems, emptyText: 'No overdue invoices.' },
     { key: 'milestones', label: 'Upcoming milestones', value: up.length, items: milestoneItems, emptyText: 'No upcoming milestones.' },
   ];
 

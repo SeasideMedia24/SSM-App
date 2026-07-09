@@ -31,6 +31,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   { href: '/my-tasks', label: 'My Tasks', icon: <IconCheck /> },
   { href: '/calculator', label: 'Calculator', icon: <IconCalc /> },
+  { href: '/invoices', label: 'Invoices', icon: <IconReceipt /> },
   { href: '/settings', label: 'Settings', icon: <IconGear /> },
 ];
 
@@ -225,6 +226,14 @@ function IconCalc() {
   return (
     <svg {...iconProps()}>
       <rect x="4" y="2" width="16" height="20" rx="2" /><path d="M8 6h8M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M8 18h8" />
+    </svg>
+  );
+}
+function IconReceipt() {
+  return (
+    <svg {...iconProps()}>
+      <path d="M4 2v20l2-1.5L8 22l2-1.5L12 22l2-1.5L16 22l2-1.5L20 22V2l-2 1.5L16 2l-2 1.5L12 2l-2 1.5L8 2 6 3.5 4 2Z" />
+      <path d="M8 7h8M8 11h8M8 15h5" />
     </svg>
   );
 }

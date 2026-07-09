@@ -5,6 +5,7 @@ import { ProductionCalculator, type QuoteInitial } from '@/components/calculator
 import { DeleteQuoteButton } from '@/components/calculator/delete-quote-button';
 import { QuoteStatusSelect } from '@/components/calculator/quote-status-select';
 import { ShareQuoteControl } from '@/components/calculator/share-quote-control';
+import { createInvoiceFromQuote } from '@/app/(app)/invoices/actions';
 import { money } from '@/lib/projects/format';
 import type { CalculatorSelections } from '@/lib/pricing/engine';
 import type { QuoteStatus } from '@/types/database.types';
@@ -152,6 +153,12 @@ export default async function CalculatorPage({
                             <Link href={`/calculator?quote=${q.id}`} className="text-xs font-medium text-sea hover:underline">
                               Open
                             </Link>
+                            <form action={createInvoiceFromQuote}>
+                              <input type="hidden" name="quote_id" value={q.id} />
+                              <button type="submit" className="text-xs font-medium text-sea hover:underline">
+                                Create invoice
+                              </button>
+                            </form>
                             <ShareQuoteControl quoteId={q.id} token={q.share_token} />
                             <DeleteQuoteButton quoteId={q.id} quoteTitle={q.title} />
                           </div>

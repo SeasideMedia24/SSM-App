@@ -17,6 +17,7 @@ export type ParaCategory = 'project' | 'area' | 'resource' | 'archive';
 export type TaskStatus = 'not_started' | 'in_progress' | 'done';
 export type TaskPriority = 'low' | 'medium' | 'high';
 export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'declined';
+export type InvoiceStatus = 'draft' | 'sent' | 'paid';
 export type ClientType = 'recurring' | 'one_time' | 'campaign';
 export type ContractStatus = 'draft' | 'sent' | 'signed' | 'declined';
 export type PricingRoleKind = 'standard' | 'photographer' | 'drone';
@@ -292,6 +293,119 @@ export type Database = {
             foreignKeyName: 'quote_line_items_quote_id_fkey';
             columns: ['quote_id'];
             referencedRelation: 'quotes';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      invoices: {
+        Row: {
+          id: string;
+          client_id: string;
+          project_id: string | null;
+          quote_id: string | null;
+          invoice_number: string | null;
+          title: string;
+          status: InvoiceStatus;
+          notes: string | null;
+          subtotal: number;
+          total: number;
+          issue_date: string | null;
+          due_date: string | null;
+          sent_at: string | null;
+          paid_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          project_id?: string | null;
+          quote_id?: string | null;
+          invoice_number?: string | null;
+          title: string;
+          status?: InvoiceStatus;
+          notes?: string | null;
+          subtotal?: number;
+          total?: number;
+          issue_date?: string | null;
+          due_date?: string | null;
+          sent_at?: string | null;
+          paid_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          client_id?: string;
+          project_id?: string | null;
+          quote_id?: string | null;
+          invoice_number?: string | null;
+          title?: string;
+          status?: InvoiceStatus;
+          notes?: string | null;
+          subtotal?: number;
+          total?: number;
+          issue_date?: string | null;
+          due_date?: string | null;
+          sent_at?: string | null;
+          paid_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'invoices_client_id_fkey';
+            columns: ['client_id'];
+            referencedRelation: 'clients';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'invoices_project_id_fkey';
+            columns: ['project_id'];
+            referencedRelation: 'projects';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'invoices_quote_id_fkey';
+            columns: ['quote_id'];
+            referencedRelation: 'quotes';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      invoice_line_items: {
+        Row: {
+          id: string;
+          invoice_id: string;
+          label: string;
+          quantity: number;
+          unit: string | null;
+          rate: number;
+          amount: number;
+          position: number;
+        };
+        Insert: {
+          id?: string;
+          invoice_id: string;
+          label: string;
+          quantity?: number;
+          unit?: string | null;
+          rate?: number;
+          amount?: number;
+          position?: number;
+        };
+        Update: {
+          id?: string;
+          invoice_id?: string;
+          label?: string;
+          quantity?: number;
+          unit?: string | null;
+          rate?: number;
+          amount?: number;
+          position?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'invoice_line_items_invoice_id_fkey';
+            columns: ['invoice_id'];
+            referencedRelation: 'invoices';
             referencedColumns: ['id'];
           },
         ];

@@ -32,7 +32,7 @@ export function DashboardMetrics({ metrics }: { metrics: MetricDef[] }) {
 
   return (
     <div className="mb-6">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {metrics.map((m) => {
           const active = m.key === openKey;
           return (

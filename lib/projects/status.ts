@@ -4,7 +4,7 @@
 //
 // (Tailwind classes are written out in full so the compiler keeps them.)
 
-import type { ProjectStatus, TaskStatus, TaskPriority, ClientType, ContractStatus, QuoteStatus } from '@/types/database.types';
+import type { ProjectStatus, TaskStatus, TaskPriority, ClientType, ContractStatus, QuoteStatus, InvoiceStatus } from '@/types/database.types';
 
 export type StatusMeta<T extends string> = {
   value: T;
@@ -51,6 +51,12 @@ export const QUOTE_STATUSES: { value: QuoteStatus; label: string; pill: string }
   { value: 'declined', label: 'Declined', pill: 'bg-red-100 text-red-700' },
 ];
 
+export const INVOICE_STATUSES: { value: InvoiceStatus; label: string; pill: string }[] = [
+  { value: 'draft', label: 'Draft', pill: 'bg-slate-100 text-slate-600' },
+  { value: 'sent', label: 'Sent', pill: 'bg-blue-100 text-blue-700' },
+  { value: 'paid', label: 'Paid', pill: 'bg-green-100 text-green-700' },
+];
+
 export const CLIENT_TYPES: { value: ClientType; label: string; pill: string }[] = [
   { value: 'recurring', label: 'Recurring', pill: 'bg-green-100 text-green-700' },
   { value: 'one_time', label: 'One-time', pill: 'bg-slate-100 text-slate-600' },
@@ -64,6 +70,7 @@ const priorityMap = new Map(TASK_PRIORITIES.map((s) => [s.value, s]));
 const clientTypeMap = new Map(CLIENT_TYPES.map((s) => [s.value, s]));
 const contractMap = new Map(CONTRACT_STATUSES.map((s) => [s.value, s]));
 const quoteMap = new Map(QUOTE_STATUSES.map((s) => [s.value, s]));
+const invoiceMap = new Map(INVOICE_STATUSES.map((s) => [s.value, s]));
 
 export const projectStatusMeta = (v: ProjectStatus) => projectMap.get(v)!;
 export const taskStatusMeta = (v: TaskStatus) => taskMap.get(v)!;
@@ -71,3 +78,4 @@ export const taskPriorityMeta = (v: TaskPriority) => priorityMap.get(v)!;
 export const clientTypeMeta = (v: ClientType) => clientTypeMap.get(v)!;
 export const contractStatusMeta = (v: ContractStatus) => contractMap.get(v)!;
 export const quoteStatusMeta = (v: QuoteStatus) => quoteMap.get(v)!;
+export const invoiceStatusMeta = (v: InvoiceStatus) => invoiceMap.get(v)!;
