@@ -134,7 +134,11 @@ export function ProductionCalculator({
         </Card>
 
         {/* ② Shoot amounts */}
-        <Card title="Shoot amounts" hint="How much time and content — everything below multiplies against these.">
+        <Card
+          title="Shoot amounts"
+          hint="How much time and content — everything below multiplies against these."
+          onReset={() => set({ pageMinutes: 0, fullDays: 0, halfDays: 0, hours: 0, droneHours: 0, shorts: 0 })}
+        >
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             <Amount label="Page / minutes" value={s.pageMinutes} onChange={(v) => set({ pageMinutes: v })} hint="drives pre & post" />
             <Amount label="Full days" value={s.fullDays} onChange={(v) => set({ fullDays: v })} />
@@ -146,7 +150,11 @@ export function ProductionCalculator({
         </Card>
 
         {/* ③ Production crew */}
-        <Card title="Production crew" hint="Check who's on the shoot. Rates come from Settings → Pricing engine.">
+        <Card
+          title="Production crew"
+          hint="Check who's on the shoot. Rates come from Settings → Pricing engine."
+          onReset={() => set({ roles: {} })}
+        >
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {roles.map((role) => {
               const sel = s.roles[role.id];
@@ -178,7 +186,11 @@ export function ProductionCalculator({
         </Card>
 
         {/* ④ Rental gear */}
-        <Card title="Equipment rental" hint="Added at list price (no markup), exactly like the sheet.">
+        <Card
+          title="Equipment rental"
+          hint="Added at list price (no markup), exactly like the sheet."
+          onReset={() => set({ rental: 'none' })}
+        >
           <div className="flex flex-wrap gap-2">
             {rentalTiers.map((t) => (
               <button
@@ -195,10 +207,24 @@ export function ProductionCalculator({
 
         {/* ⑤⑥ Pre & Post production */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <Card title="Pre-production" hint={s.pageMinutes === 0 ? 'Set page/minutes above for these to count.' : `Billed per page/minute (×${s.pageMinutes}).`}>
+          <Card
+            title="Pre-production"
+            hint={s.pageMinutes === 0 ? 'Set page/minutes above for these to count.' : `Billed per page/minute (×${s.pageMinutes}).`}
+            onReset={() => {
+              const preIds = new Set(preServices.map((x) => x.id));
+              setS((prev) => ({ ...prev, serviceIds: prev.serviceIds.filter((id) => !preIds.has(id)) }));
+            }}
+          >
             <ServiceChecks services={preServices} selected={s.serviceIds} onToggle={toggleService} />
           </Card>
-          <Card title="Post-production" hint={s.pageMinutes === 0 ? 'Set page/minutes above for these to count.' : `Billed per page/minute (×${s.pageMinutes}).`}>
+          <Card
+            title="Post-production"
+            hint={s.pageMinutes === 0 ? 'Set page/minutes above for these to count.' : `Billed per page/minute (×${s.pageMinutes}).`}
+            onReset={() => {
+              const postIds = new Set(postServices.map((x) => x.id));
+              setS((prev) => ({ ...prev, serviceIds: prev.serviceIds.filter((id) => !postIds.has(id)), aboutUs: false }));
+            }}
+          >
             <ServiceChecks services={postServices} selected={s.serviceIds} onToggle={toggleService} />
             <label className="mt-2 flex cursor-pointer items-center gap-2.5 rounded-xl border border-slate-200 px-3 py-2">
               <input type="checkbox" checked={s.aboutUs} onChange={() => set({ aboutUs: !s.aboutUs })} className="h-4 w-4 accent-teal" />
@@ -210,7 +236,7 @@ export function ProductionCalculator({
 
         {/* ⑦⑧ Travel + discounts + notes */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <Card title="Travel / Food" hint="Passed through at cost — not marked up.">
+          <Card title="Travel / Food" hint="Passed through at cost — not marked up." onReset={() => set({ travel: 0 })}>
             <div className="relative w-40">
               <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
               <input
@@ -221,7 +247,7 @@ export function ProductionCalculator({
               />
             </div>
           </Card>
-          <Card title="Discounts" hint="Stack together, off the overall total.">
+          <Card title="Discounts" hint="Stack together, off the overall total." onReset={() => set({ discounts: [] })}>
             <div className="flex flex-wrap gap-2">
               {(Object.keys(DISCOUNT_LABELS) as DiscountKey[]).map((key) => (
                 <button
@@ -277,10 +303,17 @@ export function ProductionCalculator({
 
 // --- small building blocks ---------------------------------------------------
 
-function Card({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+function Card({ title, hint, onReset, children }: { title: string; hint?: string; onReset?: () => void; children: React.ReactNode }) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+        {onReset && (
+          <button type="button" onClick={onReset} className="text-xs font-medium text-slate-400 transition-colors hover:text-sea">
+            Reset
+          </button>
+        )}
+      </div>
       {hint && <p className="mb-3 mt-0.5 text-xs text-slate-400">{hint}</p>}
       {!hint && <div className="mb-3" />}
       {children}
