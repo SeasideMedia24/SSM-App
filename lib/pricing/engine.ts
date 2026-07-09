@@ -182,3 +182,53 @@ export function computeQuote(
 
   return { lines, production, pre, post, travel, overall, discountPct, total };
 }
+
+// The COST basis behind a quote — the same pieces as computeQuote but WITHOUT
+// the markup on crew/services (rental and travel are already at cost). This is
+// what a project actually costs to deliver, so a project's budget can derive
+// from its quote while margin (charge − cost) is reported separately.
+export type CostBreakdown = {
+  crew: number;
+  rental: number;
+  pre: number;
+  post: number;
+  travel: number;
+  total: number;
+};
+
+export function computeCost(
+  s: CalculatorSelections,
+  roles: RoleRates[],
+  services: PageService[],
+  config: PricingConfig,
+): CostBreakdown {
+  let crew = 0;
+  for (const role of roles) {
+    const sel = s.roles[role.id];
+    if (!sel) continue;
+    const cost = roleCost(role, sel, s);
+    if (cost > 0) crew += cost;
+  }
+
+  const rental = s.rental !== 'none' ? r2(config[`rental_${s.rental}`] ?? 0) : 0;
+
+  let pre = 0;
+  let post = 0;
+  const selected = new Set(s.serviceIds);
+  for (const svc of services) {
+    if (!selected.has(svc.id)) continue;
+    const cost = s.pageMinutes * svc.page_rate;
+    if (cost <= 0) continue;
+    if (svc.phase === 'pre') pre += cost;
+    else post += cost;
+  }
+  if (s.aboutUs) post += config['about_us_fee'] ?? 0;
+  if (s.shorts > 0) post += s.shorts * (config['short_rate'] ?? 0);
+
+  const travel = r2(Math.max(0, s.travel));
+  const crewR = r2(crew);
+  const preR = r2(pre);
+  const postR = r2(post);
+  const total = r2(crewR + rental + preR + postR + travel);
+  return { crew: crewR, rental, pre: preR, post: postR, travel, total };
+}
