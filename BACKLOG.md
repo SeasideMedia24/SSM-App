@@ -15,13 +15,16 @@ draft contracts. (Details under "Recently shipped".)
 
 ---
 
-## 🗺️ Next up (agreed, needs a planning pass — new auth/data surfaces)
+## 🗺️ Next up
 
-- **PaePae → create invoices from templates**: blocked until the Invoices feature exists (below).
-
-- **Invoices**: an Invoices tab, invoices owed, overdue invoices on the dashboard. Out of v1 scope in BUILD-SPEC; must exist before PaePae can create invoices.
-- **Contractors + Team**: contractor logins + onboarding (like clients), internal/external contractors & employees. Pulls the roadmap's Phase-4/7 team work forward.
+- **PaePae → create invoices**: now unblocked (Invoices shipped). Add a gated
+  propose_create_invoice action (e.g. from an accepted quote), mirroring contracts.
+- **Contractors + Team** (needs a planning pass — new auth/data surface): contractor
+  logins + onboarding (like clients), internal/external contractors & employees.
+  Pulls the roadmap's Phase-4/7 team work forward.
 - **App-wide niceties**: CMD-Z undo, a back button, remember-my-view state.
+- **Invoices polish** (later): a printable/sendable invoice layout (like the shareable
+  quote link), and editing an invoice's line items after generation.
 
 ---
 
@@ -31,13 +34,13 @@ draft contracts. (Details under "Recently shipped".)
 - **Edit a project's description** (the one created from the inquiry).
 - Create an **inquiry directly from the quote screen** (client quick-add is in the current batch).
 - My Tasks: attach to "other board related items" beyond project/client.
-- Dashboard: **overdue invoices** box (depends on Invoices).
 - Re-create the **Jared Stanton** client (owner is doing this manually; the merge with Paige Moore is not auto-repaired).
 
 ---
 
 ## ✅ Recently shipped
 
+- Invoices: generate from a quote, /invoices list + detail, draft→sent→paid, overdue flag, dashboard "Overdue invoices" box. (Needs migration 20260709000001.)
 - Inquiries: archived section is a collapsible dropdown.
 - Projects: removed the Timeline view (global tab + per-project tab); milestone data untouched.
 - Deliverables overview: per-project dropdowns + inline status editing.
