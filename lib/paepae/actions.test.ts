@@ -124,6 +124,26 @@ describe('validateAction', () => {
     expect(res.ok).toBe(false);
   });
 
+  it('accepts a create_invoice with just a quote id', () => {
+    const res = validateAction('create_invoice', { quote_id: ID });
+    expect(res.ok).toBe(true);
+  });
+
+  it('accepts a create_invoice with an optional due date', () => {
+    const res = validateAction('create_invoice', { quote_id: ID, due_date: '2026-08-01' });
+    expect(res.ok).toBe(true);
+  });
+
+  it('rejects a create_invoice with a malformed due date', () => {
+    const res = validateAction('create_invoice', { quote_id: ID, due_date: '08/01/2026' });
+    expect(res.ok).toBe(false);
+  });
+
+  it('rejects a create_invoice with no quote id', () => {
+    const res = validateAction('create_invoice', { due_date: '2026-08-01' });
+    expect(res.ok).toBe(false);
+  });
+
   it('allows update_client to clear a nullable field', () => {
     const res = validateAction('update_client', {
       client_id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',

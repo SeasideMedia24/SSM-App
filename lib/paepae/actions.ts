@@ -18,6 +18,7 @@ import 'server-only';
 import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database.types';
+import { createInvoiceFromQuoteId } from '@/lib/invoices/create';
 
 type DB = SupabaseClient<Database>;
 
@@ -108,6 +109,13 @@ export const actionSchemas = {
     phone: shortText.nullable().optional(),
     notes: longText.nullable().optional(),
     client_type: clientType.optional(),
+  }),
+
+  // Invoices are generated from an existing quote (copies its line items +
+  // total) and saved as DRAFTS — PaePae never marks one sent or paid.
+  create_invoice: z.strictObject({
+    quote_id: uuid,
+    due_date: isoDate.optional(),
   }),
 
   // Contracts save as DRAFTS only — PaePae never marks one sent/signed.
@@ -234,7 +242,7 @@ export async function buildProposal(
   supabase: DB,
 ): Promise<{ ok: true; proposal: Proposal } | { ok: false; error: string }> {
   const lines: string[] = [];
-  const skip = new Set(['project_id', 'client_id', 'task_id', 'line_items']);
+  const skip = new Set(['project_id', 'client_id', 'task_id', 'quote_id', 'line_items']);
 
   // Resolve IDs to names AND verify they exist. A missing one aborts the card.
   if (typeof params.project_id === 'string') {
@@ -269,6 +277,18 @@ export async function buildProposal(
       return { ok: false, error: `No task matches that id. Use list_tasks to get a real id, then try again.` };
     }
     lines.push(`Task: ${data.title}`);
+  }
+  if (typeof params.quote_id === 'string') {
+    const { data } = await supabase
+      .from('quotes')
+      .select('title, total')
+      .eq('id', params.quote_id)
+      .maybeSingle();
+    if (!data) {
+      return { ok: false, error: `No quote matches that id. Use list_quotes to get a real id, then try again.` };
+    }
+    lines.push(`Quote: ${data.title}`);
+    lines.push(`Amount: $${Number(data.total).toLocaleString()} (copied from the quote)`);
   }
 
   // List the fields being set/changed.
@@ -379,6 +399,13 @@ export async function executeAction(
       return `Updated client “${data.name}”.`;
     }
 
+    case 'create_invoice': {
+      const p = parsed.data as ActionParams<'create_invoice'>;
+      // Reuses the shared quote → invoice copy (always a draft).
+      const invoice = await createInvoiceFromQuoteId(supabase, p.quote_id, { dueDate: p.due_date });
+      return `Created draft invoice “${invoice.title}” — $${Number(invoice.total).toLocaleString()} (from the quote).`;
+    }
+
     case 'create_contract': {
       const p = parsed.data as ActionParams<'create_contract'>;
       // Always a draft — PaePae never marks a contract sent or signed.
@@ -432,5 +459,7 @@ export function pathsToRevalidate(action: ActionName): string[] {
       return ['/calculator', '/dashboard'];
     case 'create_contract':
       return ['/projects/contracts', '/projects'];
+    case 'create_invoice':
+      return ['/invoices', '/dashboard'];
   }
 }

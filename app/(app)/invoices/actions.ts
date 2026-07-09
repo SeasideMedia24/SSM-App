@@ -7,60 +7,18 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createClient as createSupabaseServer } from '@/lib/supabase/server';
+import { createInvoiceFromQuoteId } from '@/lib/invoices/create';
 import type { InvoiceStatus } from '@/types/database.types';
 
-// Default payment terms when generating an invoice (net-14).
-const DEFAULT_NET_DAYS = 14;
-const iso = (d: Date) => d.toISOString().slice(0, 10);
-
-// Create a draft invoice from an existing quote: copies the client, project,
-// title, totals, notes, and every line item. Redirects to the new invoice.
+// Create a draft invoice from an existing quote, then open it. The copy logic is
+// shared with PaePae's create_invoice action (lib/invoices/create.ts).
 export async function createInvoiceFromQuote(formData: FormData) {
   const quoteId = String(formData.get('quote_id') ?? '').trim();
   if (!quoteId) redirect('/calculator');
 
   const supabase = await createSupabaseServer();
-
-  const { data: quote } = await supabase
-    .from('quotes')
-    .select('id, title, client_id, project_id, subtotal, total, notes')
-    .eq('id', quoteId)
-    .single();
-  if (!quote) redirect('/calculator');
-
-  const { data: lines } = await supabase
-    .from('quote_line_items')
-    .select('label, quantity, unit, rate, amount, position')
-    .eq('quote_id', quoteId)
-    .order('position');
-
-  // Simple sequential invoice number (single-user; fine without a sequence).
-  const { count } = await supabase.from('invoices').select('id', { count: 'exact', head: true });
-  const invoiceNumber = `INV-${String((count ?? 0) + 1).padStart(4, '0')}`;
-
-  const now = new Date();
-  const { data: invoice, error } = await supabase
-    .from('invoices')
-    .insert({
-      client_id: quote.client_id,
-      project_id: quote.project_id,
-      quote_id: quote.id,
-      invoice_number: invoiceNumber,
-      title: quote.title,
-      status: 'draft',
-      notes: quote.notes,
-      subtotal: quote.subtotal,
-      total: quote.total,
-      issue_date: iso(now),
-      due_date: iso(new Date(now.getTime() + DEFAULT_NET_DAYS * 86400000)),
-    })
-    .select('id')
-    .single();
-  if (error || !invoice) redirect('/calculator');
-
-  if (lines && lines.length > 0) {
-    await supabase.from('invoice_line_items').insert(lines.map((l) => ({ ...l, invoice_id: invoice.id })));
-  }
+  const invoice = await createInvoiceFromQuoteId(supabase, quoteId).catch(() => null);
+  if (!invoice) redirect('/calculator');
 
   revalidatePath('/invoices');
   revalidatePath('/dashboard');

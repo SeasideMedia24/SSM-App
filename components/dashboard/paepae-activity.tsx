@@ -24,6 +24,7 @@ const ACTION_LABELS: Record<string, string> = {
   update_client: 'Updated a client',
   create_quote: 'Saved a draft quote',
   create_contract: 'Drafted a contract',
+  create_invoice: 'Created an invoice',
 };
 
 function timeAgo(iso: string): string {

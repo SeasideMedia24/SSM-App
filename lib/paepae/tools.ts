@@ -134,6 +134,8 @@ const proposeDescriptions: Record<ActionName, string> = {
     'Propose saving a DRAFT quote for a client, with line items (label, quantity, unit, rate). Totals are computed server-side. Use list_quotes/list_clients first for context; check rate presets with the user if unsure of pricing. Requires user confirmation.',
   create_contract:
     'Propose drafting a contract for a project (title, notes for the terms, and an optional amount). Look up the project first (list_projects) to get its id. Saved as a DRAFT — you never mark a contract sent or signed. Requires user confirmation.',
+  create_invoice:
+    'Propose creating an invoice from an existing quote — it copies the quote\'s line items and total into a DRAFT invoice for the same client. Look the quote up first (list_quotes) to get its id. Optionally set a due date (YYYY-MM-DD; defaults to 14 days out). You never mark an invoice sent or paid. Requires user confirmation.',
 };
 
 // Build the Anthropic tool definitions from the zod schemas.
