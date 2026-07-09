@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
+import { Collapsible } from '@/components/ui/collapsible';
 import { projectTypeLabel } from '@/lib/projects/template';
 import { setInquiryStatus } from './actions';
 
@@ -262,10 +263,7 @@ export default async function InquiriesPage() {
           {/* Archived inquiries — the archival database. Kept out of the active
               lists but always here for reference; one click restores one. */}
           {archivedSubs.length > 0 && (
-            <section>
-              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-                Archived <span className="text-slate-400">· {archivedSubs.length}</span>
-              </h2>
+            <Collapsible title="Archived" count={archivedSubs.length} defaultOpen={false}>
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <table className="w-full text-sm">
                   <thead>
@@ -305,7 +303,7 @@ export default async function InquiriesPage() {
                   </tbody>
                 </table>
               </div>
-            </section>
+            </Collapsible>
           )}
         </div>
       )}
