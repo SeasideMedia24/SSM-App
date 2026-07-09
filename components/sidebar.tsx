@@ -23,7 +23,6 @@ const NAV_ITEMS: NavItem[] = [
     icon: <IconStack />,
     children: [
       { href: '/projects', label: 'Board' },
-      { href: '/projects/timeline', label: 'Timeline' },
       { href: '/projects/deliverables', label: 'Deliverables' },
       { href: '/projects/contracts', label: 'Contracts' },
       { href: '/projects/expenses', label: 'Expenses' },
@@ -37,7 +36,7 @@ const NAV_ITEMS: NavItem[] = [
 
 // The global-view child paths (used so "Board" isn't marked active on them).
 const GLOBAL_VIEW_PATHS = [
-  '/projects/timeline', '/projects/deliverables', '/projects/contracts',
+  '/projects/deliverables', '/projects/contracts',
   '/projects/expenses', '/projects/budget',
 ];
 

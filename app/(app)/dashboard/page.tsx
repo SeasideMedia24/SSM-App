@@ -47,7 +47,7 @@ export default async function DashboardPage() {
     id: d.id, label: d.title, kind: 'Deliverable', project: proj(d.projects as ProjRel), projectView: 'deliverables', date: fmtDate(d.due_date),
   }));
   const milestoneItems: MetricItem[] = up.map((m) => ({
-    id: m.id, label: m.title, kind: 'Milestone', project: proj(m.projects as ProjRel), projectView: 'timeline', date: fmtDate(m.date),
+    id: m.id, label: m.title, kind: 'Milestone', project: proj(m.projects as ProjRel), date: fmtDate(m.date),
   }));
   const projectItems: MetricItem[] = projectsList.map((p) => ({
     id: p.id, label: p.title, href: `/projects/${p.id}`, kind: projectStatusMeta(p.status as ProjectStatus).label, date: fmtDate(p.due_date),

@@ -10,7 +10,6 @@ import { motion } from 'motion/react';
 export const PROJECT_VIEWS = [
   { key: 'overview', label: 'Overview' },
   { key: 'tasks', label: 'Tasks' },
-  { key: 'timeline', label: 'Timeline' },
   { key: 'deliverables', label: 'Deliverables' },
   { key: 'contracts', label: 'Contracts' },
   { key: 'expenses', label: 'Expenses' },

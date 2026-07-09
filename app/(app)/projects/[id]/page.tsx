@@ -7,7 +7,7 @@ import { DeleteProjectButton } from '@/components/projects/delete-project-button
 import { ViewSwitcher } from '@/components/projects/view-switcher';
 import { TasksPanel } from '@/components/projects/tasks-panel';
 import {
-  DeliverablesPanel, ContractsPanel, ExpensesPanel, BudgetPanel, TimelinePanel,
+  DeliverablesPanel, ContractsPanel, ExpensesPanel, BudgetPanel,
 } from '@/components/projects/panels';
 import { ProjectPriorityControl } from '@/components/projects/priority-picker';
 import { ArchiveControl } from '@/components/projects/archive-control';
@@ -40,14 +40,13 @@ export default async function ProjectDetailPage({
   // Fetch everything this project owns (small per project) in parallel.
   const [
     { data: tasks }, { data: deliverables }, { data: contracts },
-    { data: expenses }, { data: budgetLines }, { data: milestones }, { data: acceptedQuotes },
+    { data: expenses }, { data: budgetLines }, { data: acceptedQuotes },
   ] = await Promise.all([
     supabase.from('tasks').select('id, title, status, priority, due_date').eq('project_id', id).order('created_at'),
     supabase.from('deliverables').select('*').eq('project_id', id).order('position'),
     supabase.from('contracts').select('*').eq('project_id', id).order('position'),
     supabase.from('expenses').select('*').eq('project_id', id).order('spent_on', { ascending: true, nullsFirst: false }),
     supabase.from('budget_lines').select('*').eq('project_id', id).order('position'),
-    supabase.from('milestones').select('*').eq('project_id', id).order('date', { ascending: true, nullsFirst: false }),
     supabase.from('quotes').select('total').eq('project_id', id).eq('status', 'accepted'),
   ]);
 
@@ -65,7 +64,6 @@ export default async function ProjectDetailPage({
     contracts: (contracts ?? []).length,
     expenses: (expenses ?? []).length,
     budget: (budgetLines ?? []).length,
-    timeline: (milestones ?? []).length,
   };
 
   return (
@@ -108,7 +106,6 @@ export default async function ProjectDetailPage({
 
       {view === 'tasks' && <TasksPanel projectId={project.id} tasks={taskList} />}
       {view === 'deliverables' && <DeliverablesPanel projectId={project.id} items={deliverables ?? []} />}
-      {view === 'timeline' && <TimelinePanel projectId={project.id} items={milestones ?? []} />}
       {view === 'contracts' && <ContractsPanel projectId={project.id} items={contracts ?? []} />}
       {view === 'expenses' && <ExpensesPanel projectId={project.id} items={expenses ?? []} />}
       {view === 'budget' && (
@@ -121,7 +118,6 @@ export default async function ProjectDetailPage({
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             <StatLink id={project.id} view="tasks" label="Tasks" value={counts.tasks} />
             <StatLink id={project.id} view="deliverables" label="Deliverables" value={counts.deliverables} />
-            <StatLink id={project.id} view="timeline" label="Timeline" value={counts.timeline} />
             <StatLink id={project.id} view="contracts" label="Contracts" value={counts.contracts} />
             <StatLink id={project.id} view="expenses" label="Expenses" value={counts.expenses} />
             <StatLink id={project.id} view="budget" label="Budget" value={counts.budget} />
