@@ -51,6 +51,10 @@ export default async function InquiriesPage() {
     .order('created_at', { ascending: false });
 
   const subs: Submission[] = data ?? [];
+  // Archived inquiries drop out of the active lists but stay in the archival
+  // view at the bottom.
+  const activeSubs = subs.filter((s) => s.status !== 'archived');
+  const archivedSubs = subs.filter((s) => s.status === 'archived');
 
   // ---- Summary stats ----
   const now = new Date();
@@ -178,9 +182,9 @@ export default async function InquiriesPage() {
           )}
 
           {/* All inquiries */}
-          {subs.length === 0 ? (
+          {activeSubs.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 px-6 py-14 text-center">
-              <p className="text-sm text-slate-500">No inquiries yet.</p>
+              <p className="text-sm text-slate-500">No active inquiries.</p>
               <p className="mt-1 text-sm text-slate-400">
                 Share your onboarding link (see{' '}
                 <Link href="/settings" className="text-sea underline">Settings</Link>
@@ -204,7 +208,7 @@ export default async function InquiriesPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {subs.map((s) => (
+                    {activeSubs.map((s) => (
                       <tr key={s.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                         <td className="px-4 py-3">
                           {s.client_id ? (
@@ -233,14 +237,76 @@ export default async function InquiriesPage() {
                             {s.status === 'new' ? 'New' : 'Reviewed'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          <form action={setInquiryStatus}>
-                            <input type="hidden" name="id" value={s.id} />
-                            <input type="hidden" name="status" value={s.status === 'new' ? 'reviewed' : 'new'} />
-                            <button type="submit" className="text-xs font-medium text-slate-400 hover:text-slate-700">
-                              {s.status === 'new' ? 'Mark reviewed' : 'Mark new'}
-                            </button>
-                          </form>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-3">
+                            <form action={setInquiryStatus}>
+                              <input type="hidden" name="id" value={s.id} />
+                              <input type="hidden" name="status" value={s.status === 'new' ? 'reviewed' : 'new'} />
+                              <button type="submit" className="text-xs font-medium text-slate-400 hover:text-slate-700">
+                                {s.status === 'new' ? 'Mark reviewed' : 'Mark new'}
+                              </button>
+                            </form>
+                            <form action={setInquiryStatus}>
+                              <input type="hidden" name="id" value={s.id} />
+                              <input type="hidden" name="status" value="archived" />
+                              <button type="submit" className="text-xs font-medium text-slate-400 hover:text-red-600">
+                                Archive
+                              </button>
+                            </form>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {/* Archived inquiries — the archival database. Kept out of the active
+              lists but always here for reference; one click restores one. */}
+          {archivedSubs.length > 0 && (
+            <section>
+              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+                Archived <span className="text-slate-400">· {archivedSubs.length}</span>
+              </h2>
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                      <th className="px-4 py-3 font-medium">Name</th>
+                      <th className="px-4 py-3 font-medium">Project</th>
+                      <th className="px-4 py-3 font-medium">Budget</th>
+                      <th className="px-4 py-3 font-medium">Received</th>
+                      <th className="px-4 py-3" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {archivedSubs.map((s) => (
+                      <tr key={s.id} className="border-b border-slate-100 last:border-0 text-slate-500 hover:bg-slate-50">
+                        <td className="px-4 py-3">
+                          {s.client_id ? (
+                            <Link href={`/clients/${s.client_id}`} className="font-medium text-slate-700 hover:underline">
+                              {s.name}
+                            </Link>
+                          ) : (
+                            <span className="font-medium text-slate-700">{s.name}</span>
+                          )}
+                          {s.company && <p className="text-xs text-slate-400">{s.company}</p>}
+                        </td>
+                        <td className="px-4 py-3">{projectTypeLabel(s.project_type) ?? '—'}</td>
+                        <td className="px-4 py-3">{s.budget_range ?? '—'}</td>
+                        <td className="px-4 py-3">{fmtDate(s.created_at)}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end">
+                            <form action={setInquiryStatus}>
+                              <input type="hidden" name="id" value={s.id} />
+                              <input type="hidden" name="status" value="new" />
+                              <button type="submit" className="text-xs font-medium text-slate-400 hover:text-sea">
+                                Restore
+                              </button>
+                            </form>
+                          </div>
                         </td>
                       </tr>
                     ))}
