@@ -17,8 +17,6 @@ draft contracts. (Details under "Recently shipped".)
 
 ## 🗺️ Next up
 
-- **PaePae → create invoices**: now unblocked (Invoices shipped). Add a gated
-  propose_create_invoice action (e.g. from an accepted quote), mirroring contracts.
 - **Contractors + Team** (needs a planning pass — new auth/data surface): contractor
   logins + onboarding (like clients), internal/external contractors & employees.
   Pulls the roadmap's Phase-4/7 team work forward.
@@ -40,7 +38,8 @@ draft contracts. (Details under "Recently shipped".)
 
 ## ✅ Recently shipped
 
-- Invoices: generate from a quote, /invoices list + detail, draft→sent→paid, overdue flag, dashboard "Overdue invoices" box. (Needs migration 20260709000001.)
+- PaePae: can create invoices from a quote (gated), via the shared invoice helper.
+- Invoices: generate from a quote, /invoices list + detail, draft→sent→paid, overdue flag, dashboard "Overdue invoices" box. (Migration 20260709000001 applied.)
 - Inquiries: archived section is a collapsible dropdown.
 - Projects: removed the Timeline view (global tab + per-project tab); milestone data untouched.
 - Deliverables overview: per-project dropdowns + inline status editing.
