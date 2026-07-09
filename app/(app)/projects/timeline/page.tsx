@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
 import { GlobalEmpty, proj, type ProjRel } from '@/components/projects/global-table';
-import { GroupedByProject, groupByProject } from '@/components/projects/grouped-view';
+import { GroupedByProject } from '@/components/projects/grouped-view';
+import { groupByProject } from '@/lib/projects/grouping';
 
 export default async function AllTimelinePage() {
   const supabase = await createClient();
