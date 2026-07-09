@@ -207,7 +207,7 @@ export function PaePaeChat() {
             <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl brand-gradient text-lg font-semibold text-white">
               P
             </div>
-            <h2 className="font-display text-2xl tracking-wide text-ink">Kia ora, I&rsquo;m PaePae</h2>
+            <h2 className="font-display text-2xl tracking-wide text-ink">Heyyy, I&rsquo;m PaePae!</h2>
             <p className="mt-1 text-sm text-slate-500">
               Your studio assistant. I can look things up, draft messages, and manage tasks,
               projects, clients, and quotes — every change shows you a card to confirm first.
