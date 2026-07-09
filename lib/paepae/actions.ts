@@ -110,6 +110,14 @@ export const actionSchemas = {
     client_type: clientType.optional(),
   }),
 
+  // Contracts save as DRAFTS only — PaePae never marks one sent/signed.
+  create_contract: z.strictObject({
+    project_id: uuid,
+    title: shortText,
+    notes: longText.optional(),
+    amount: z.number().min(0).max(10_000_000).optional(),
+  }),
+
   // Quotes save as DRAFTS only — PaePae never marks a quote sent/accepted.
   create_quote: z.strictObject({
     client_id: uuid,
@@ -371,6 +379,18 @@ export async function executeAction(
       return `Updated client “${data.name}”.`;
     }
 
+    case 'create_contract': {
+      const p = parsed.data as ActionParams<'create_contract'>;
+      // Always a draft — PaePae never marks a contract sent or signed.
+      const { data, error } = await supabase
+        .from('contracts')
+        .insert({ ...p, status: 'draft' })
+        .select('id, title')
+        .single();
+      if (error) throw friendlyError(error);
+      return `Drafted contract “${data.title}”.`;
+    }
+
     case 'create_quote': {
       const { line_items, ...quote } = parsed.data as ActionParams<'create_quote'>;
       // Totals are computed HERE, server-side — never taken from the model.
@@ -410,5 +430,7 @@ export function pathsToRevalidate(action: ActionName): string[] {
       return ['/clients'];
     case 'create_quote':
       return ['/calculator', '/dashboard'];
+    case 'create_contract':
+      return ['/projects/contracts', '/projects'];
   }
 }

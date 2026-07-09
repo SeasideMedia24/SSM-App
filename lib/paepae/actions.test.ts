@@ -105,6 +105,25 @@ describe('validateAction', () => {
     expect(res.ok).toBe(false);
   });
 
+  it('accepts a well-formed create_contract with an optional amount', () => {
+    const res = validateAction('create_contract', {
+      project_id: ID,
+      title: 'Production agreement',
+      notes: 'Standard terms.',
+      amount: 5000,
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it('rejects a create_contract with a negative amount', () => {
+    const res = validateAction('create_contract', {
+      project_id: ID,
+      title: 'Bad',
+      amount: -1,
+    });
+    expect(res.ok).toBe(false);
+  });
+
   it('allows update_client to clear a nullable field', () => {
     const res = validateAction('update_client', {
       client_id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',

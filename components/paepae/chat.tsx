@@ -45,6 +45,7 @@ const ACTION_TITLES: Record<string, string> = {
   create_client: 'Add client',
   update_client: 'Update client',
   create_quote: 'Save draft quote',
+  create_contract: 'Draft contract',
 };
 
 // Starter prompts for the empty state — tuned to what PaePae can actually do.
