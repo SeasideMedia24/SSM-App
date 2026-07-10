@@ -3,14 +3,14 @@ import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
 import { buttonClass } from '@/components/ui/button-styles';
 import { contractorTypeMeta } from '@/lib/projects/status';
-import { money } from '@/lib/projects/format';
+import { contractorRatesSummary } from '@/lib/projects/format';
 import type { ContractorType } from '@/types/database.types';
 
 export default async function ContractorsPage() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('contractors')
-    .select('id, name, type, role, default_rate, rate_unit, project_contractors(count)')
+    .select('id, name, type, role, rate_full, rate_half, rate_hourly, project_contractors(count)')
     .order('name');
 
   const contractors = data ?? [];
@@ -46,7 +46,7 @@ export default async function ContractorsPage() {
                   <th className="px-4 py-3 font-medium">Name</th>
                   <th className="px-4 py-3 font-medium">Type</th>
                   <th className="px-4 py-3 font-medium">Role</th>
-                  <th className="px-4 py-3 font-medium">Default rate</th>
+                  <th className="px-4 py-3 font-medium">Rates</th>
                   <th className="px-4 py-3 font-medium">Projects</th>
                 </tr>
               </thead>
@@ -62,9 +62,7 @@ export default async function ContractorsPage() {
                         <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${meta.pill}`}>{meta.label}</span>
                       </td>
                       <td className="px-4 py-3 text-slate-600">{c.role ?? '—'}</td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {c.default_rate != null ? `${money(c.default_rate)}${c.rate_unit ? ` / ${c.rate_unit}` : ''}` : '—'}
-                      </td>
+                      <td className="px-4 py-3 text-slate-600">{contractorRatesSummary(c)}</td>
                       <td className="px-4 py-3 text-slate-500">{assignmentCount(c)}</td>
                     </tr>
                   );

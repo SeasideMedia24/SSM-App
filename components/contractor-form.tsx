@@ -27,6 +27,18 @@ function SaveButton({ editing }: { editing: boolean }) {
 const fieldClass =
   'rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-ink outline-none transition-shadow focus:border-teal focus:ring-2 focus:ring-aqua/40';
 
+function RateInput({ id, label, defaultValue }: { id: string; label: string; defaultValue: number | null | undefined }) {
+  return (
+    <label htmlFor={id} className="flex flex-col gap-1 text-xs text-slate-500">
+      {label}
+      <span className="relative">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
+        <input id={id} name={id} type="number" min="0" step="0.01" defaultValue={defaultValue ?? ''} className={`${fieldClass} w-full pl-6`} />
+      </span>
+    </label>
+  );
+}
+
 export function ContractorForm({ contractor }: { contractor?: Contractor }) {
   const [state, formAction] = useActionState(saveContractor, initialState);
   const editing = Boolean(contractor);
@@ -68,19 +80,14 @@ export function ContractorForm({ contractor }: { contractor?: Contractor }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="default_rate" className="text-sm font-medium text-slate-700">Default rate</label>
-          <div className="relative">
-            <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
-            <input id="default_rate" name="default_rate" type="number" min="0" step="0.01" defaultValue={contractor?.default_rate ?? ''} className={`${fieldClass} pl-7 w-full`} />
-          </div>
+      <fieldset className="flex flex-col gap-1.5">
+        <legend className="mb-1.5 text-sm font-medium text-slate-700">Rates</legend>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <RateInput id="rate_full" label="Full day" defaultValue={contractor?.rate_full} />
+          <RateInput id="rate_half" label="Half day" defaultValue={contractor?.rate_half} />
+          <RateInput id="rate_hourly" label="Hourly" defaultValue={contractor?.rate_hourly} />
         </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="rate_unit" className="text-sm font-medium text-slate-700">Rate unit</label>
-          <input id="rate_unit" name="rate_unit" placeholder="e.g. day, hour, project" defaultValue={contractor?.rate_unit ?? ''} className={fieldClass} />
-        </div>
-      </div>
+      </fieldset>
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor="notes" className="text-sm font-medium text-slate-700">Notes</label>

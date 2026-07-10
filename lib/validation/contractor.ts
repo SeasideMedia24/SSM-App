@@ -10,7 +10,6 @@ export const contractorSchema = z.object({
   phone: z.string().trim().max(50).optional(),
   type: z.enum(CONTRACTOR_TYPE_VALUES).optional(),
   role: z.string().trim().max(200).optional(),
-  rate_unit: z.string().trim().max(50).optional(),
   notes: z.string().trim().max(5000).optional(),
 });
 

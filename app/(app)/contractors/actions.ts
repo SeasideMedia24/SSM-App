@@ -34,8 +34,9 @@ export async function saveContractor(_prev: ContractorFormState, formData: FormD
     phone: emptyToNull(parsed.data.phone),
     type: parsed.data.type ?? 'external',
     role: emptyToNull(parsed.data.role),
-    default_rate: parseRate(formData.get('default_rate')),
-    rate_unit: emptyToNull(parsed.data.rate_unit),
+    rate_full: parseRate(formData.get('rate_full')),
+    rate_half: parseRate(formData.get('rate_half')),
+    rate_hourly: parseRate(formData.get('rate_hourly')),
     notes: emptyToNull(parsed.data.notes),
   };
 
@@ -66,6 +67,18 @@ export async function deleteContractor(formData: FormData) {
 
   revalidatePath('/contractors');
   redirect('/contractors');
+}
+
+// Generate (or refresh) a private self-onboarding link for a contractor. The
+// owner shares the resulting /contractor-onboard/<token> link; the contractor
+// fills in their own contact details and rates (no login).
+export async function generateContractorOnboardToken(formData: FormData) {
+  const contractorId = String(formData.get('id') ?? '').trim();
+  if (!contractorId) return;
+
+  const supabase = await createSupabaseServer();
+  await supabase.from('contractors').update({ onboard_token: crypto.randomUUID() }).eq('id', contractorId);
+  revalidatePath(`/contractors/${contractorId}`);
 }
 
 // Assign a contractor to a project with an optional rate (falls back to the

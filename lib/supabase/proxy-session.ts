@@ -13,7 +13,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 // Routes a signed-out user is allowed to see (login, the public onboarding
 // form, and shared quote links).
-const PUBLIC_PREFIXES = ['/login', '/auth', '/onboard', '/quote'];
+const PUBLIC_PREFIXES = ['/login', '/auth', '/onboard', '/contractor-onboard', '/quote'];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });

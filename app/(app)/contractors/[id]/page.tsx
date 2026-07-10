@@ -4,9 +4,10 @@ import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
 import { buttonClass } from '@/components/ui/button-styles';
 import { DeleteContractorButton } from '@/components/contractors/delete-contractor-button';
+import { OnboardLinkControl } from '@/components/contractors/onboard-link-control';
 import { assignProject, unassignProject } from '../actions';
 import { contractorTypeMeta } from '@/lib/projects/status';
-import { money } from '@/lib/projects/format';
+import { money, contractorRatesSummary } from '@/lib/projects/format';
 import type { ContractorType } from '@/types/database.types';
 
 type ProjRel = { id: string; title: string } | { id: string; title: string }[] | null;
@@ -39,9 +40,7 @@ export default async function ContractorDetailPage({
   const assignedIds = new Set(rows.map((r) => oneProject(r.projects as ProjRel)?.id).filter(Boolean));
   const availableProjects = (allProjects ?? []).filter((p) => !assignedIds.has(p.id));
   const meta = contractorTypeMeta(contractor.type as ContractorType);
-  const rateLabel = contractor.default_rate != null
-    ? `${money(contractor.default_rate)}${contractor.rate_unit ? ` / ${contractor.rate_unit}` : ''}`
-    : null;
+  const ratesText = contractorRatesSummary(contractor);
 
   return (
     <>
@@ -62,7 +61,7 @@ export default async function ContractorDetailPage({
       <div className="-mt-3 mb-6 flex flex-wrap items-center gap-3 text-sm">
         <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${meta.pill}`}>{meta.label}</span>
         {contractor.role && <span className="text-slate-600">{contractor.role}</span>}
-        {rateLabel && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{rateLabel}</span>}
+        {ratesText !== '—' && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{ratesText}</span>}
         {contractor.email && <a href={`mailto:${contractor.email}`} className="text-sea hover:underline">{contractor.email}</a>}
         {contractor.phone && <span className="text-slate-500">{contractor.phone}</span>}
       </div>
@@ -73,6 +72,15 @@ export default async function ContractorDetailPage({
           <p className="whitespace-pre-wrap text-sm text-slate-800">{contractor.notes}</p>
         </div>
       )}
+
+      {/* Self-onboarding link */}
+      <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-1 text-sm font-semibold text-slate-900">Onboarding link</h2>
+        <p className="mb-3 text-xs text-slate-400">
+          Share a private link so {contractor.name.split(' ')[0]} can fill in their own contact details and rates. No login needed.
+        </p>
+        <OnboardLinkControl contractorId={contractor.id} token={contractor.onboard_token} onboardedAt={contractor.onboarded_at} />
+      </section>
 
       {/* Project assignments */}
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -86,8 +94,8 @@ export default async function ContractorDetailPage({
               const p = oneProject(r.projects as ProjRel);
               const rate = r.rate != null
                 ? `${money(r.rate)}${r.rate_unit ? ` / ${r.rate_unit}` : ''}`
-                : rateLabel
-                  ? `${rateLabel} (default)`
+                : ratesText !== '—'
+                  ? `${ratesText} (default)`
                   : '—';
               return (
                 <li key={r.id} className="flex items-center gap-3 py-2.5 text-sm">
