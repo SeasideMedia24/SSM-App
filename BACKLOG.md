@@ -18,10 +18,10 @@ draft contracts. (Details under "Recently shipped".)
 ## 🗺️ Next up
 
 - **Contractors — Slice B (security-critical, needs its own plan)**: contractor
-  logins + onboarding (like clients) + role-based RLS so a contractor sees only
-  their own assignments and rate. The `contractors.onboard_token` / `user_id`
-  columns are already in place. This is the real multi-user surface — plan and
-  review it deliberately before building.
+  **logins** + role-based RLS so a contractor sees only their own assignments and
+  rate. (Self-service profile onboarding via link is already done — this is just
+  the accounts + permission model.) The `contractors.user_id` column is in place.
+  This is the real multi-user surface — plan and review it deliberately.
 - **Contractors — nice-to-haves**: show a project's assigned team on the project
   page; roll assignment costs into the project budget.
 - **App-wide niceties**: CMD-Z undo, a back button, remember-my-view state.
@@ -42,6 +42,7 @@ draft contracts. (Details under "Recently shipped".)
 
 ## ✅ Recently shipped
 
+- Contractors: full/half/hourly rates + self-onboarding link (no login). (Migration 20260709000003.)
 - Contractors/Team (Slice A): directory (internal/external/employees), rates, and project assignments. (Migration 20260709000002.)
 - PaePae: can create invoices from a quote (gated), via the shared invoice helper.
 - Invoices: generate from a quote, /invoices list + detail, draft→sent→paid, overdue flag, dashboard "Overdue invoices" box. (Migration 20260709000001 applied.)
