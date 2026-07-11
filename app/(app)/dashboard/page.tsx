@@ -4,15 +4,26 @@ import { PageHeader } from '@/components/page-header';
 import { proj, type ProjRel } from '@/components/projects/global-table';
 import { PaepaeActivity, type PaepaeAction } from '@/components/dashboard/paepae-activity';
 import { DashboardMetrics, type MetricDef, type MetricItem } from '@/components/dashboard/metrics';
+import { CalendarBlock, type CalendarItem } from '@/components/dashboard/calendar-block';
+import { parseMonthParam, monthBounds } from '@/lib/dashboard/calendar';
 import { fmtDate, money } from '@/lib/projects/format';
 import { quoteStatusMeta, projectStatusMeta } from '@/lib/projects/status';
 import type { QuoteStatus, ProjectStatus } from '@/types/database.types';
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cal?: string }>;
+}) {
+  const { cal } = await searchParams;
   const supabase = await createClient();
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
   const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString();
+
+  // The month the calendar block shows (?cal=YYYY-MM; defaults to this month).
+  const calMonth = parseMonthParam(cal, today);
+  const { first: calFirst, last: calLast } = monthBounds(calMonth);
 
   const [
     { data: overdueTasks },
@@ -22,6 +33,10 @@ export default async function DashboardPage() {
     { data: recentQuotes },
     { data: overdueInvoices },
     { data: paepaeActions },
+    { data: calTasks },
+    { data: calDeliverables },
+    { data: calMilestones },
+    { data: calProjects },
   ] = await Promise.all([
     supabase.from('tasks').select('id, title, due_date, projects(id, title)').lt('due_date', today).neq('status', 'done').order('due_date'),
     supabase.from('deliverables').select('id, title, due_date, projects(id, title)').lt('due_date', today).neq('status', 'done').order('due_date'),
@@ -34,6 +49,11 @@ export default async function DashboardPage() {
     // PaePae's recent confirmed actions. Tolerant of the table not existing yet
     // (before the migration is applied) — the query just returns an error we ignore.
     supabase.from('paepae_actions').select('id, action, summary, result, created_at').gte('created_at', fiveDaysAgo).order('created_at', { ascending: false }).limit(20),
+    // Calendar block: everything dated inside the displayed month.
+    supabase.from('tasks').select('id, title, status, due_date, project_id').gte('due_date', calFirst).lte('due_date', calLast),
+    supabase.from('deliverables').select('id, title, status, due_date, project_id').gte('due_date', calFirst).lte('due_date', calLast),
+    supabase.from('milestones').select('id, title, status, date, project_id').gte('date', calFirst).lte('date', calLast),
+    supabase.from('projects').select('id, title, due_date').neq('status', 'archived').gte('due_date', calFirst).lte('due_date', calLast),
   ]);
 
   const oTasks = overdueTasks ?? [];
@@ -64,6 +84,32 @@ export default async function DashboardPage() {
     kind: (inv.clients as unknown as { name: string } | null)?.name,
     date: fmtDate(inv.due_date),
   }));
+
+  // Group the month's dated items by day for the calendar block. Tasks may have
+  // no project now — those link to My Tasks instead of a project page.
+  const itemsByDay: Record<string, CalendarItem[]> = {};
+  const addCal = (iso: string | null, item: CalendarItem) => {
+    if (!iso) return;
+    (itemsByDay[iso] ??= []).push(item);
+  };
+  for (const m of calMilestones ?? []) {
+    addCal(m.date, { id: m.id, title: m.title, kind: 'milestone', href: `/projects/${m.project_id}`, done: m.status === 'done' });
+  }
+  for (const p of calProjects ?? []) {
+    addCal(p.due_date, { id: p.id, title: p.title, kind: 'project', href: `/projects/${p.id}` });
+  }
+  for (const d of calDeliverables ?? []) {
+    addCal(d.due_date, { id: d.id, title: d.title, kind: 'deliverable', href: `/projects/${d.project_id}?view=deliverables`, done: d.status === 'done' });
+  }
+  for (const t of calTasks ?? []) {
+    addCal(t.due_date, {
+      id: t.id,
+      title: t.title,
+      kind: 'task',
+      href: t.project_id ? `/projects/${t.project_id}?view=tasks` : '/my-tasks',
+      done: t.status === 'done',
+    });
+  }
 
   const metrics: MetricDef[] = [
     { key: 'projects', label: 'Active projects', value: projectsList.length, items: projectItems, emptyText: 'No active projects.' },
@@ -107,6 +153,11 @@ export default async function DashboardPage() {
             </ul>
           )}
         </Panel>
+      </div>
+
+      {/* Month calendar of everything dated — under the blocks above. */}
+      <div className="mt-6">
+        <CalendarBlock month={calMonth} todayIso={today} itemsByDay={itemsByDay} />
       </div>
     </>
   );

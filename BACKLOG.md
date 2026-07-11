@@ -22,7 +22,7 @@ draft contracts. (Details under "Recently shipped".)
 3. **PaePae integrations (Phase 3 — plan first)**: email sending, QuickBooks invoicing, Google Calendar meetings. Needs OAuth/provider decisions with the owner before any code.
 4. ✅ **PaePae autonomy** — task/project/client/quote/contract create+update now execute immediately with receipt cards (logged to the dashboard action log). Confirmation reserved for invoicing today + email/calendar/onboarding-link sends when they arrive (`CONFIRM_ACTIONS` in lib/paepae/actions.ts).
 5. ✅ **PaePae tasks without a project** — create_task takes optional project/client; update_task can attach/detach later.
-6. **Dashboard calendar block**: month calendar of tasks/projects/milestones/deliverables as a block under the current dashboard blocks. Google Calendar two-way sync belongs to the Phase 3 integrations item.
+6. ✅ **Dashboard calendar block** — shipped 2026-07-11: month grid of tasks/projects/milestones/deliverables under the dashboard blocks, with month nav (?cal=). Google Calendar two-way sync still belongs to the Phase 3 integrations item (3).
 7. ✅ **Menu: Inquiries under People + notification badges** — red count pills (new inquiries on Inquiries/People, overdue tasks on My Tasks); PaePae updates and team messages join once messaging exists.
 8. **Internal messaging (clients + team chat in-app)** — depends on real multi-user logins (Contractors Slice B / client accounts). Plan it together with that security work.
 
