@@ -19,10 +19,10 @@ draft contracts. (Details under "Recently shipped".)
 
 1. ✅ **Calculator: whole-calculator Reset button** — in the Totals card (new-quote mode), two-step confirm, clears the saved draft too.
 2. ✅ **Calculator: saved quotes rework** — top dropdown removed; the list shows the 5 newest with a Notion-style "Past quotes" toggle for the rest.
-3. **PaePae integrations (Phase 3 — plan first)**: email sending, QuickBooks invoicing, Google Calendar meetings. Needs OAuth/provider decisions with the owner before any code.
+3. **PaePae integrations (Phase 3 — plan first)**: email sending, QuickBooks invoicing, Google Calendar meeting BOOKING (read-only viewing shipped — see item 6; booking needs a write scope + confirm gate). Needs OAuth/provider decisions with the owner before code.
 4. ✅ **PaePae autonomy** — task/project/client/quote/contract create+update now execute immediately with receipt cards (logged to the dashboard action log). Confirmation reserved for invoicing today + email/calendar/onboarding-link sends when they arrive (`CONFIRM_ACTIONS` in lib/paepae/actions.ts).
 5. ✅ **PaePae tasks without a project** — create_task takes optional project/client; update_task can attach/detach later.
-6. ✅ **Dashboard calendar block** — shipped 2026-07-11: month grid of tasks/projects/milestones/deliverables under the dashboard blocks, with month nav (?cal=). Google Calendar two-way sync still belongs to the Phase 3 integrations item (3).
+6. ✅ **Dashboard calendar** — shipped 2026-07-11 in two passes: (a) month grid of tasks/projects/milestones/deliverables; (b) full rebuild — Apple-style month view, Week + Day views with an all-day strip and 12 AM–11:59 PM time grid, source tabs (Seaside Media / Personal / Everything), and read-only Google Calendar sync (OAuth connect in Settings, per-calendar include toggles, migration 20260711000001). Owner still to do: Google Cloud credentials + run the migration. Event BOOKING stays in item 3.
 7. ✅ **Menu: Inquiries under People + notification badges** — red count pills (new inquiries on Inquiries/People, overdue tasks on My Tasks); PaePae updates and team messages join once messaging exists.
 8. **Internal messaging (clients + team chat in-app)** — depends on real multi-user logins (Contractors Slice B / client accounts). Plan it together with that security work.
 

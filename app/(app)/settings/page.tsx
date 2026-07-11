@@ -2,13 +2,22 @@ import { createClient } from '@/lib/supabase/server';
 import { PageHeader, ComingSoon } from '@/components/page-header';
 import { PublicOnboardLink } from '@/components/settings/public-onboard-link';
 import { PricingEngine } from '@/components/settings/pricing-engine';
+import { GoogleCalendarSettings, type GoogleCalendarRow } from '@/components/settings/google-calendar';
+import { googleConfigured } from '@/lib/google/calendar';
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ google?: string }>;
+}) {
+  const { google: googleFlag } = await searchParams;
   const supabase = await createClient();
-  const [{ data: roles }, { data: services }, { data: configRows }] = await Promise.all([
+  const [{ data: roles }, { data: services }, { data: configRows }, { data: googleAccount }, { data: googleCals }] = await Promise.all([
     supabase.from('pricing_roles').select('*').order('sort'),
     supabase.from('pricing_page_services').select('*').order('sort'),
     supabase.from('pricing_config').select('*'),
+    supabase.from('google_accounts').select('email').maybeSingle(),
+    supabase.from('google_calendars').select('id, summary, color, is_primary, included').order('summary'),
   ]);
   const config = Object.fromEntries((configRows ?? []).map((c) => [c.key, c.value]));
   const ratesMissing = !roles || roles.length === 0;
@@ -27,6 +36,16 @@ export default async function SettingsPage() {
           </p>
           <PublicOnboardLink />
         </div>
+      </section>
+
+      <section className="mb-8" id="google-calendar">
+        <h2 className="mb-3 text-sm font-semibold text-slate-900">Google Calendar</h2>
+        <GoogleCalendarSettings
+          configured={googleConfigured()}
+          connectedEmail={googleAccount ? (googleAccount.email ?? null) : undefined}
+          calendars={(googleCals ?? []) as GoogleCalendarRow[]}
+          flag={googleFlag}
+        />
       </section>
 
       <section className="mb-8">

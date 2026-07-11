@@ -58,6 +58,96 @@ export function daysInMonth({ year, month }: MonthRef): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
+// ── Views (month / week / day) ───────────────────────────────────────────────
+
+export type CalView = 'month' | 'week' | 'day';
+export type CalSource = 'ssm' | 'personal' | 'all';
+
+export function parseView(v: string | undefined): CalView {
+  return v === 'week' || v === 'day' ? v : 'month';
+}
+
+export function parseSource(v: string | undefined): CalSource {
+  return v === 'personal' || v === 'all' ? v : 'ssm';
+}
+
+// The anchor is the date the view is centred on: ?cal=YYYY-MM-DD (a bare
+// YYYY-MM is accepted and means the 1st of that month). Anything malformed
+// falls back to today.
+export function parseAnchor(param: string | undefined, todayIso: string): string {
+  const candidate = param && /^\d{4}-\d{2}$/.test(param) ? `${param}-01` : param;
+  if (candidate && /^\d{4}-\d{2}-\d{2}$/.test(candidate)) {
+    const d = new Date(`${candidate}T00:00:00Z`);
+    // Round-trip check rejects impossible dates like 2026-02-31.
+    if (!Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === candidate) return candidate;
+  }
+  return todayIso;
+}
+
+export function monthOf(iso: string): MonthRef {
+  return { year: Number(iso.slice(0, 4)), month: Number(iso.slice(5, 7)) };
+}
+
+export function addDays(iso: string, delta: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
+// Sunday-first week containing the anchor.
+export function weekBounds(iso: string): { first: string; last: string } {
+  const weekday = new Date(`${iso}T00:00:00Z`).getUTCDay(); // 0 = Sunday
+  const first = addDays(iso, -weekday);
+  return { first, last: addDays(first, 6) };
+}
+
+export function weekDays(iso: string): string[] {
+  const { first } = weekBounds(iso);
+  return Array.from({ length: 7 }, (_, i) => addDays(first, i));
+}
+
+// The date range a view displays — also the DB query bounds.
+export function rangeForView(view: CalView, anchor: string): { first: string; last: string } {
+  if (view === 'day') return { first: anchor, last: anchor };
+  if (view === 'week') return weekBounds(anchor);
+  return monthBounds(monthOf(anchor));
+}
+
+// Where the ‹ › arrows land, per view.
+export function navAnchors(view: CalView, anchor: string): { prev: string; next: string } {
+  if (view === 'day') return { prev: addDays(anchor, -1), next: addDays(anchor, 1) };
+  if (view === 'week') return { prev: addDays(anchor, -7), next: addDays(anchor, 7) };
+  const ref = monthOf(anchor);
+  const p = addMonths(ref, -1);
+  const n = addMonths(ref, 1);
+  return { prev: isoOf(p.year, p.month, 1), next: isoOf(n.year, n.month, 1) };
+}
+
+// Header label per view: "July 2026" · "Jul 5 – 11, 2026" · "Saturday, July 11, 2026".
+export function viewLabel(view: CalView, anchor: string): string {
+  if (view === 'month') return monthLabel(monthOf(anchor));
+  const utc = (iso: string) => new Date(`${iso}T00:00:00Z`);
+  if (view === 'day') {
+    return utc(anchor).toLocaleDateString('en-US', {
+      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+    });
+  }
+  const { first, last } = weekBounds(anchor);
+  const f = utc(first);
+  const l = utc(last);
+  const fLabel = f.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const lLabel = l.toLocaleDateString('en-US', {
+    ...(f.getUTCMonth() === l.getUTCMonth() ? {} : { month: 'short' as const }),
+    day: 'numeric', timeZone: 'UTC',
+  });
+  return `${fLabel} – ${lLabel}, ${l.getUTCFullYear()}`;
+}
+
+// Short weekday name for column headers ("Sun", "Mon", …).
+export function weekdayShort(iso: string): string {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+}
+
 // The full grid: Sunday-first weeks covering the whole month (4–6 rows).
 // Leading/trailing cells from the neighbouring months are marked inMonth:false.
 export function monthGrid(ref: MonthRef): CalendarDay[][] {

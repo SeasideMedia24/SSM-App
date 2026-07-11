@@ -912,6 +912,60 @@ export type Database = {
           },
         ];
       };
+      google_accounts: {
+        Row: {
+          user_id: string;
+          email: string | null;
+          refresh_token: string;
+          access_token: string | null;
+          access_token_expires_at: string | null;
+          connected_at: string;
+        };
+        Insert: {
+          user_id: string;
+          email?: string | null;
+          refresh_token: string;
+          access_token?: string | null;
+          access_token_expires_at?: string | null;
+          connected_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          email?: string | null;
+          refresh_token?: string;
+          access_token?: string | null;
+          access_token_expires_at?: string | null;
+          connected_at?: string;
+        };
+        Relationships: [];
+      };
+      google_calendars: {
+        Row: {
+          user_id: string;
+          id: string;
+          summary: string;
+          color: string | null;
+          is_primary: boolean;
+          included: boolean;
+        };
+        Insert: {
+          user_id: string;
+          id: string;
+          summary?: string;
+          color?: string | null;
+          is_primary?: boolean;
+          included?: boolean;
+        };
+        Update: {
+          user_id?: string;
+          id?: string;
+          summary?: string;
+          color?: string | null;
+          is_primary?: boolean;
+          included?: boolean;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
