@@ -27,6 +27,8 @@ type ProposalState = 'pending' | 'executing' | 'done' | 'cancelled' | 'error';
 type Part =
   | { kind: 'text'; text: string }
   | { kind: 'lookup'; label: string }
+  // An AUTO action the server already executed — rendered as a receipt.
+  | { kind: 'receipt'; action: string; summary: string[]; message: string }
   | {
       kind: 'proposal';
       proposal: ProposalPayload;
@@ -135,11 +137,31 @@ export function PaePaeChat() {
     }
   }
 
-  function handleEvent(ev: { t: string; d?: string; label?: string; proposal?: ProposalPayload; message?: string }) {
+  function handleEvent(ev: {
+    t: string;
+    d?: string;
+    label?: string;
+    proposal?: ProposalPayload;
+    message?: string;
+    action?: string;
+    summary?: string[];
+  }) {
     if (ev.t === 'text' && ev.d) {
       setMessages((m) => appendText(m, ev.d!));
     } else if (ev.t === 'lookup' && ev.label) {
       setMessages((m) => appendPart(m, { kind: 'lookup', label: ev.label! }));
+    } else if (ev.t === 'action' && ev.action) {
+      // Already executed server-side — show the receipt and refresh the app's
+      // server components so the change is visible everywhere immediately.
+      setMessages((m) =>
+        appendPart(m, {
+          kind: 'receipt',
+          action: ev.action!,
+          summary: ev.summary ?? [],
+          message: ev.message ?? 'Done.',
+        }),
+      );
+      router.refresh();
     } else if (ev.t === 'proposal' && ev.proposal) {
       setMessages((m) =>
         appendPart(m, { kind: 'proposal', proposal: ev.proposal!, state: 'pending' }),
@@ -211,8 +233,9 @@ export function PaePaeChat() {
             </div>
             <h2 className="font-display text-2xl tracking-wide text-ink">Heyyy, I&rsquo;m PaePae!</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Your studio assistant. I can look things up, draft messages, and manage tasks,
-              projects, clients, and quotes — every change shows you a card to confirm first.
+              Your studio assistant. Ask me to look things up, draft messages, or just handle
+              it — tasks, projects, clients, quotes, and contracts get done on the spot (you’ll
+              see receipts). Only invoices and anything that <em>sends</em> wait for your OK.
             </p>
             <div className="mt-6 grid gap-2 sm:grid-cols-2">
               {SUGGESTIONS.map((s) => (
@@ -309,6 +332,9 @@ function Message({
               </span>
             );
           }
+          if (part.kind === 'receipt') {
+            return <ReceiptCard key={pi} part={part} />;
+          }
           if (part.kind === 'proposal') {
             return <ProposalCard key={pi} part={part} onDecide={(ok) => onDecide(pi, ok)} />;
           }
@@ -321,6 +347,30 @@ function Message({
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// A receipt for an action PaePae already carried out (the autonomy policy —
+// most actions run immediately; only sends/invoices wait for a Confirm).
+function ReceiptCard({ part }: { part: Extract<Part, { kind: 'receipt' }> }) {
+  const title = ACTION_TITLES[part.action] ?? part.action;
+  return (
+    <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm">
+      <div className="flex items-center gap-2 bg-emerald-600/90 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white">
+        <IconBolt /> {title}
+        <span className="ml-auto font-normal normal-case tracking-normal text-white/85">done ✓</span>
+      </div>
+      {part.summary.length > 0 && (
+        <ul className="space-y-1 px-4 py-3 text-sm text-slate-700">
+          {part.summary.map((line, i) => (
+            <li key={i}>{line}</li>
+          ))}
+        </ul>
+      )}
+      <div className="border-t border-slate-100 px-4 py-2.5">
+        <span className="text-xs font-medium text-emerald-600">✓ {part.message}</span>
       </div>
     </div>
   );
@@ -412,6 +462,8 @@ function partToText(part: Part): string {
       return part.text;
     case 'lookup':
       return '';
+    case 'receipt':
+      return `[Executed ${part.action}: ${part.summary.join('; ')} — result: ${part.message}]`;
     case 'proposal': {
       const what = `${part.proposal.action}: ${part.proposal.summary.join('; ')}`;
       switch (part.state) {

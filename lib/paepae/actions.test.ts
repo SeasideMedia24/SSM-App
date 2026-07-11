@@ -14,10 +14,11 @@ import {
   computeQuoteLineItems,
   buildProposal,
   isActionName,
+  requiresConfirmation,
   actionSchemas,
   type ActionName,
 } from './actions';
-import { actionFromToolName } from './tools';
+import { actionFromToolName, toolNameFor } from './tools';
 
 // A tiny stand-in for the Supabase client that only supports the narrow chain
 // buildProposal uses: from(table).select(cols).eq('id', id).maybeSingle().
@@ -223,5 +224,31 @@ describe('action name helpers', () => {
       expect(isActionName(name)).toBe(true);
     }
     expect(isActionName('delete_task')).toBe(false);
+  });
+});
+
+describe('autonomy policy (owner, 2026-07-11)', () => {
+  it('only invoicing requires confirmation; everything else is auto', () => {
+    for (const name of Object.keys(actionSchemas) as ActionName[]) {
+      expect(requiresConfirmation(name)).toBe(name === 'create_invoice');
+    }
+  });
+
+  it('auto actions use bare tool names; gated ones keep the propose_ prefix', () => {
+    expect(toolNameFor('create_task')).toBe('create_task');
+    expect(toolNameFor('create_invoice')).toBe('propose_create_invoice');
+  });
+
+  it('bare tool names map back to actions too', () => {
+    expect(actionFromToolName('create_task')).toBe('create_task');
+    expect(actionFromToolName('update_client')).toBe('update_client');
+  });
+
+  it('tasks no longer need a project (standalone, or client-attached)', () => {
+    expect(validateAction('create_task', { title: 'Order gaffer tape' }).ok).toBe(true);
+    expect(validateAction('create_task', { title: 'Call back', client_id: ID }).ok).toBe(true);
+    // update_task can attach or detach a project later
+    expect(validateAction('update_task', { task_id: ID, project_id: ID }).ok).toBe(true);
+    expect(validateAction('update_task', { task_id: ID, project_id: null }).ok).toBe(true);
   });
 });

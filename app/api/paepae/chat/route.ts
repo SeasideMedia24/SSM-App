@@ -6,20 +6,32 @@
 //
 //   {"t":"text","d":"…"}                 — a chunk of PaePae's reply
 //   {"t":"lookup","label":"…"}           — PaePae read something (chip in UI)
+//   {"t":"action","action","summary","message"} — an AUTO action that already
+//                                          executed server-side (receipt card)
 //   {"t":"proposal","proposal":{…}}      — a gated write for the user to Confirm
 //   {"t":"error","message":"…"}          — something went wrong
 //
-// Proposals do NOT write anything. The Confirm button posts them to
-// /api/paepae/execute, which re-validates and executes. Auth + RLS throughout.
+// Autonomy policy (see lib/paepae/actions.ts): most actions execute immediately
+// after validation + reference checks, and the user sees a receipt. Only
+// "send"-like actions (invoicing today; email/calendar/onboarding links later)
+// emit a proposal, which /api/paepae/execute runs after an explicit Confirm.
+// Auth + RLS throughout either way.
 
 import { NextRequest } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import type Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@/lib/supabase/server';
 import { getAnthropic, PAEPAE_MODEL } from '@/lib/paepae/client';
 import { paepaeSystemPrompt } from '@/lib/paepae/system';
 import { allPaepaeTools, runTool, actionFromToolName } from '@/lib/paepae/tools';
-import { validateAction, buildProposal } from '@/lib/paepae/actions';
+import {
+  validateAction,
+  buildProposal,
+  executeAction,
+  requiresConfirmation,
+  pathsToRevalidate,
+} from '@/lib/paepae/actions';
 
 export const runtime = 'nodejs';
 
@@ -131,8 +143,8 @@ export async function POST(req: NextRequest) {
                 continue;
               }
               // buildProposal also verifies referenced records exist under RLS.
-              // If an id doesn't resolve, we DON'T show a card — we hand the
-              // error back so PaePae can look the id up again and retry.
+              // If an id doesn't resolve, we DON'T act — we hand the error back
+              // so PaePae can look the id up again and retry.
               const built = await buildProposal(action, checked.params, supabase);
               if (!built.ok) {
                 toolResults.push({
@@ -143,13 +155,48 @@ export async function POST(req: NextRequest) {
                 });
                 continue;
               }
-              emit({ t: 'proposal', proposal: built.proposal });
-              toolResults.push({
-                type: 'tool_result',
-                tool_use_id: block.id,
-                content:
-                  'Proposal card shown to the user. It has NOT been executed — the user must click Confirm. Briefly note what you proposed and wait; never claim it is done.',
-              });
+
+              if (requiresConfirmation(action)) {
+                // Gated ("send"-like) action: show the card and wait for the
+                // user's explicit Confirm. Nothing has run.
+                emit({ t: 'proposal', proposal: built.proposal });
+                toolResults.push({
+                  type: 'tool_result',
+                  tool_use_id: block.id,
+                  content:
+                    'Proposal card shown to the user. It has NOT been executed — the user must click Confirm. Briefly note what you proposed and wait; never claim it is done.',
+                });
+                continue;
+              }
+
+              // AUTO action: execute right now, then show a receipt.
+              try {
+                const message = await executeAction(action, checked.params, supabase);
+
+                // Best-effort follow-ups; never fail an action that succeeded.
+                try {
+                  for (const path of pathsToRevalidate(action)) revalidatePath(path);
+                } catch { /* revalidation is cosmetic here */ }
+                await supabase
+                  .from('paepae_actions')
+                  .insert({ user_id: user.id, action, summary: built.proposal.summary, result: message })
+                  .then(() => undefined, () => undefined);
+
+                emit({ t: 'action', action, summary: built.proposal.summary, message });
+                toolResults.push({
+                  type: 'tool_result',
+                  tool_use_id: block.id,
+                  content: `Executed. ${message}`,
+                });
+              } catch (err) {
+                const message = err instanceof Error ? err.message : 'The action failed.';
+                toolResults.push({
+                  type: 'tool_result',
+                  tool_use_id: block.id,
+                  content: `The action failed: ${message}`,
+                  is_error: true,
+                });
+              }
             } else {
               // A read tool.
               emit({ t: 'lookup', label: LOOKUP_LABELS[block.name] ?? `Ran ${block.name}` });

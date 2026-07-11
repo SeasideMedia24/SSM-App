@@ -21,11 +21,11 @@ const NAV_ITEMS: NavItem[] = [
     icon: <IconUsers />,
     children: [
       { href: '/clients', label: 'Clients' },
+      { href: '/inquiries', label: 'Inquiries' },
       { href: '/contractors', label: 'Team' },
       { href: '/onboarding', label: 'Onboarding' },
     ],
   },
-  { href: '/inquiries', label: 'Inquiries', icon: <IconInbox /> },
   {
     href: '/projects',
     label: 'Projects',
@@ -50,7 +50,15 @@ const GLOBAL_VIEW_PATHS = [
   '/projects/deliverables', '/projects/contracts', '/projects/budget',
 ];
 
-export function Sidebar({ userEmail }: { userEmail: string }) {
+export function Sidebar({
+  userEmail,
+  badges = {},
+}: {
+  userEmail: string;
+  // Notification counts keyed by nav href (from the server layout) — e.g. new
+  // inquiries, overdue tasks. Sections roll up their children's counts.
+  badges?: Record<string, number>;
+}) {
   const pathname = usePathname();
 
   return (
@@ -63,7 +71,7 @@ export function Sidebar({ userEmail }: { userEmail: string }) {
       <nav className="flex-1 space-y-1 px-3">
         {NAV_ITEMS.map((item) =>
           item.children ? (
-            <NavGroup key={item.href} item={item} pathname={pathname} />
+            <NavGroup key={item.href} item={item} pathname={pathname} badges={badges} />
           ) : (
             <NavLink
               key={item.href}
@@ -71,6 +79,7 @@ export function Sidebar({ userEmail }: { userEmail: string }) {
               icon={item.icon}
               label={item.label}
               active={pathname === item.href || pathname.startsWith(item.href + '/')}
+              badge={badges[item.href]}
             />
           ),
         )}
@@ -102,7 +111,17 @@ export function Sidebar({ userEmail }: { userEmail: string }) {
   );
 }
 
-function NavLink({ href, icon, label, active }: { href: string; icon: React.ReactNode; label: string; active: boolean }) {
+// The red notification pill. Renders nothing when there's nothing to flag.
+function Badge({ n }: { n?: number }) {
+  if (!n) return null;
+  return (
+    <span className="relative z-10 ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+      {n > 99 ? '99+' : n}
+    </span>
+  );
+}
+
+function NavLink({ href, icon, label, active, badge }: { href: string; icon: React.ReactNode; label: string; active: boolean; badge?: number }) {
   return (
     <Link href={href} className="relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors">
       {active && (
@@ -110,6 +129,7 @@ function NavLink({ href, icon, label, active }: { href: string; icon: React.Reac
       )}
       <span className={`relative z-10 transition-colors ${active ? 'text-aqua' : 'text-white/60'}`}>{icon}</span>
       <span className={`relative z-10 transition-colors ${active ? 'text-white' : 'text-white/70'}`}>{label}</span>
+      <Badge n={badge} />
     </Link>
   );
 }
@@ -124,11 +144,14 @@ function isChildActive(childHref: string, pathname: string): boolean {
   return pathname === childHref || pathname.startsWith(childHref + '/');
 }
 
-function NavGroup({ item, pathname }: { item: NavItem; pathname: string }) {
+function NavGroup({ item, pathname, badges = {} }: { item: NavItem; pathname: string; badges?: Record<string, number> }) {
   // The group is highlighted whenever any of its children is active — works for
   // People (whose pages don't share the parent's URL prefix) and Projects alike.
   const parentActive = (item.children ?? []).some((c) => isChildActive(c.href, pathname));
   const [open, setOpen] = useState(parentActive);
+  // The section rolls up its children's counts (e.g. People shows new inquiries
+  // even while collapsed).
+  const groupCount = (item.children ?? []).reduce((sum, c) => sum + (badges[c.href] ?? 0), 0);
 
   return (
     <div>
@@ -139,6 +162,7 @@ function NavGroup({ item, pathname }: { item: NavItem; pathname: string }) {
         <Link href={item.href} className="relative z-10 flex flex-1 items-center gap-3 px-3 py-2.5 text-sm font-medium">
           <span className={`transition-colors ${parentActive ? 'text-aqua' : 'text-white/60'}`}>{item.icon}</span>
           <span className={`transition-colors ${parentActive ? 'text-white' : 'text-white/70'}`}>{item.label}</span>
+          <Badge n={groupCount} />
         </Link>
         <button
           type="button"
@@ -165,9 +189,10 @@ function NavGroup({ item, pathname }: { item: NavItem; pathname: string }) {
                 <li key={c.href}>
                   <Link
                     href={c.href}
-                    className={`ml-9 block rounded-lg px-3 py-1.5 text-[13px] transition-colors ${active ? 'font-medium text-aqua' : 'text-white/55 hover:text-white'}`}
+                    className={`ml-9 flex items-center rounded-lg px-3 py-1.5 text-[13px] transition-colors ${active ? 'font-medium text-aqua' : 'text-white/55 hover:text-white'}`}
                   >
                     {c.label}
+                    <Badge n={badges[c.href]} />
                   </Link>
                 </li>
               );

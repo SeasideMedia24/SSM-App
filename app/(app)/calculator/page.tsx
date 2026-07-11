@@ -2,8 +2,8 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
 import { ProductionCalculator, type QuoteInitial } from '@/components/calculator/production-calculator';
-import { SavedQuotePicker } from '@/components/calculator/saved-quote-picker';
 import { DeleteQuoteButton } from '@/components/calculator/delete-quote-button';
+import { Collapsible } from '@/components/ui/collapsible';
 import { QuoteStatusSelect } from '@/components/calculator/quote-status-select';
 import { ShareQuoteControl } from '@/components/calculator/share-quote-control';
 import { createInvoiceFromQuote } from '@/app/(app)/invoices/actions';
@@ -95,18 +95,6 @@ export default async function CalculatorPage({
           </p>
         )}
 
-        {/* Quick-load a past quote into the calculator. */}
-        {!ratesMissing && quotes && quotes.length > 0 && (
-          <SavedQuotePicker
-            quotes={quotes.map((q) => ({
-              id: q.id,
-              title: q.title,
-              client: (q.clients as unknown as { name: string } | null)?.name ?? null,
-            }))}
-            currentId={editId ?? null}
-          />
-        )}
-
         {!ratesMissing && (
           <ProductionCalculator
             key={initial?.id ?? (saved === '1' ? 'saved' : 'new')}
@@ -137,61 +125,90 @@ export default async function CalculatorPage({
           )}
 
           {quotes && quotes.length > 0 && (
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
-                    <th className="px-4 py-3 font-medium">Quote</th>
-                    <th className="px-4 py-3 font-medium">Client</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 text-right font-medium">Total</th>
-                    <th className="px-4 py-3 font-medium">Created</th>
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {quotes.map((q) => {
-                    // Supabase's joined single-FK relation arrives as an object.
-                    const clientName = (q.clients as unknown as { name: string } | null)?.name ?? '—';
-                    return (
-                      <tr key={q.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                        <td className="px-4 py-3">
-                          <Link href={`/calculator?quote=${q.id}`} className="font-medium text-slate-900 hover:underline">
-                            {q.title}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">{clientName}</td>
-                        <td className="px-4 py-3">
-                          <QuoteStatusSelect quoteId={q.id} status={q.status as QuoteStatus} />
-                        </td>
-                        <td className="px-4 py-3 text-right font-medium text-slate-900">{money(q.total)}</td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {new Date(q.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-3">
-                            <Link href={`/calculator?quote=${q.id}`} className="text-xs font-medium text-sea hover:underline">
-                              Open
-                            </Link>
-                            <form action={createInvoiceFromQuote}>
-                              <input type="hidden" name="quote_id" value={q.id} />
-                              <button type="submit" className="text-xs font-medium text-sea hover:underline">
-                                Create invoice
-                              </button>
-                            </form>
-                            <ShareQuoteControl quoteId={q.id} token={q.share_token} />
-                            <DeleteQuoteButton quoteId={q.id} quoteTitle={q.title} />
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className="space-y-4">
+              {/* The latest few, always visible… */}
+              <QuotesTable rows={quotes.slice(0, RECENT_COUNT)} />
+
+              {/* …and the rest behind a Notion-style toggle. */}
+              {quotes.length > RECENT_COUNT && (
+                <Collapsible title="Past quotes" count={quotes.length - RECENT_COUNT} defaultOpen={false}>
+                  <QuotesTable rows={quotes.slice(RECENT_COUNT)} />
+                </Collapsible>
+              )}
             </div>
           )}
         </section>
       </div>
     </>
+  );
+}
+
+// How many of the newest quotes stay visible above the "Past quotes" toggle.
+const RECENT_COUNT = 5;
+
+type QuoteRow = {
+  id: string;
+  title: string;
+  status: string;
+  total: number;
+  created_at: string;
+  share_token: string | null;
+  clients: unknown;
+};
+
+function QuotesTable({ rows }: { rows: QuoteRow[] }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+            <th className="px-4 py-3 font-medium">Quote</th>
+            <th className="px-4 py-3 font-medium">Client</th>
+            <th className="px-4 py-3 font-medium">Status</th>
+            <th className="px-4 py-3 text-right font-medium">Total</th>
+            <th className="px-4 py-3 font-medium">Created</th>
+            <th className="px-4 py-3" />
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((q) => {
+            // Supabase's joined single-FK relation arrives as an object.
+            const clientName = (q.clients as { name: string } | null)?.name ?? '—';
+            return (
+              <tr key={q.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                <td className="px-4 py-3">
+                  <Link href={`/calculator?quote=${q.id}`} className="font-medium text-slate-900 hover:underline">
+                    {q.title}
+                  </Link>
+                </td>
+                <td className="px-4 py-3 text-slate-600">{clientName}</td>
+                <td className="px-4 py-3">
+                  <QuoteStatusSelect quoteId={q.id} status={q.status as QuoteStatus} />
+                </td>
+                <td className="px-4 py-3 text-right font-medium text-slate-900">{money(q.total)}</td>
+                <td className="px-4 py-3 text-slate-600">
+                  {new Date(q.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <div className="flex items-center justify-end gap-3">
+                    <Link href={`/calculator?quote=${q.id}`} className="text-xs font-medium text-sea hover:underline">
+                      Open
+                    </Link>
+                    <form action={createInvoiceFromQuote}>
+                      <input type="hidden" name="quote_id" value={q.id} />
+                      <button type="submit" className="text-xs font-medium text-sea hover:underline">
+                        Create invoice
+                      </button>
+                    </form>
+                    <ShareQuoteControl quoteId={q.id} token={q.share_token} />
+                    <DeleteQuoteButton quoteId={q.id} quoteTitle={q.title} />
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

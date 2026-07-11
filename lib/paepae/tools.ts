@@ -19,7 +19,7 @@ import type {
   TaskStatus,
   QuoteStatus,
 } from '@/types/database.types';
-import { actionSchemas, type ActionName, isActionName } from './actions';
+import { actionSchemas, type ActionName, isActionName, requiresConfirmation } from './actions';
 import { getBriefing } from './briefing';
 
 type DB = SupabaseClient<Database>;
@@ -107,58 +107,70 @@ export const paepaeTools: Anthropic.Tool[] = [
   },
 ];
 
-// ── Propose tools (write powers, gated) ─────────────────────────────────────
-// One propose_* tool per action in lib/paepae/actions.ts. Calling one of these
-// does NOT change anything — the route validates the input, shows the user a
-// confirmation card, and only /api/paepae/execute (after an explicit Confirm
-// click) ever writes. Input schemas are generated from the same zod schemas
-// that validate execution, so the two can never drift apart.
+// ── Action tools (write powers) ──────────────────────────────────────────────
+// One tool per action in lib/paepae/actions.ts. Input schemas are generated
+// from the same zod schemas that validate execution, so the two can never
+// drift apart. Two flavors, per the autonomy policy in actions.ts:
+//
+//   • AUTO actions (most): tool name is the bare action ("create_task"). The
+//     route validates, verifies referenced records, executes immediately, and
+//     the user sees a receipt card.
+//   • CONFIRM actions (sends/invoices): tool name keeps the "propose_" prefix.
+//     Calling one only shows a confirmation card — /api/paepae/execute writes
+//     after the user clicks Confirm.
 
 const PROPOSE_PREFIX = 'propose_';
 
 // When each write tool should be reached for — shown to the model.
-const proposeDescriptions: Record<ActionName, string> = {
+const actionDescriptions: Record<ActionName, string> = {
   create_task:
-    'Propose creating a task in a project. Look up the project first (list_projects) to get its id. The user will see a confirmation card and must approve before anything is created.',
+    'Create a task immediately. A project is OPTIONAL — tasks can stand alone, or attach to a project (project_id) and/or client (client_id); look ids up first (list_projects/list_clients) when attaching. The owner sees a receipt card.',
   update_task:
-    'Propose changing an existing task (title, description, status, priority, due date — including marking it done). Look the task up first (list_tasks) to get its id. Requires user confirmation.',
+    'Update an existing task immediately (title, description, status, priority, due date — including marking it done — or attach/detach a project or client). Look the task up first (list_tasks) to get its id.',
   create_project:
-    'Propose creating a new project for a client. Look up the client first (list_clients) to get its id. Requires user confirmation.',
+    'Create a new project for a client immediately. Look up the client first (list_clients) to get its id.',
   update_project:
-    'Propose changing an existing project (title, status, priority, dates, type). Look the project up first (list_projects) to get its id. Requires user confirmation.',
+    'Update an existing project immediately (title, status, priority, dates, type). Look the project up first (list_projects) to get its id.',
   create_client:
-    'Propose adding a new client record (name, company, contact details, notes, type). Requires user confirmation.',
+    'Add a new client record immediately (name, company, contact details, notes, type).',
   update_client:
-    'Propose updating an existing client record. Look the client up first (list_clients) to get its id. Requires user confirmation.',
+    'Update an existing client record immediately. Look the client up first (list_clients) to get its id.',
   create_quote:
-    'Propose saving a DRAFT quote for a client, with line items (label, quantity, unit, rate). Totals are computed server-side. Use list_quotes/list_clients first for context; check rate presets with the user if unsure of pricing. Requires user confirmation.',
+    'Save a DRAFT quote for a client immediately, with line items (label, quantity, unit, rate). Totals are computed server-side. Use list_quotes/list_clients first for context; check pricing with the owner if unsure. Never mark a quote sent or accepted.',
   create_contract:
-    'Propose drafting a contract for a project (title, notes for the terms, and an optional amount). Look up the project first (list_projects) to get its id. Saved as a DRAFT — you never mark a contract sent or signed. Requires user confirmation.',
+    'Draft a contract for a project immediately (title, notes for the terms, optional amount). Look up the project first (list_projects). Saved as a DRAFT — you never mark a contract sent or signed.',
   create_invoice:
-    'Propose creating an invoice from an existing quote — it copies the quote\'s line items and total into a DRAFT invoice for the same client. Look the quote up first (list_quotes) to get its id. Optionally set a due date (YYYY-MM-DD; defaults to 14 days out). You never mark an invoice sent or paid. Requires user confirmation.',
+    'Propose creating an invoice from an existing quote — it copies the quote\'s line items and total into a DRAFT invoice for the same client. Look the quote up first (list_quotes) to get its id. Optionally set a due date (YYYY-MM-DD; defaults to 14 days out). You never mark an invoice sent or paid. REQUIRES the owner\'s confirmation — the card must be confirmed before anything happens.',
 };
 
+// "create_task" for auto actions; "propose_create_invoice" for gated ones.
+export function toolNameFor(action: ActionName): string {
+  return requiresConfirmation(action) ? `${PROPOSE_PREFIX}${action}` : action;
+}
+
 // Build the Anthropic tool definitions from the zod schemas.
-export const proposeTools: Anthropic.Tool[] = (
+export const actionTools: Anthropic.Tool[] = (
   Object.keys(actionSchemas) as ActionName[]
 ).map((action) => {
   const schema = z.toJSONSchema(actionSchemas[action]) as Record<string, unknown>;
   delete schema.$schema; // Anthropic wants a bare JSON schema object
   return {
-    name: `${PROPOSE_PREFIX}${action}`,
-    description: proposeDescriptions[action],
+    name: toolNameFor(action),
+    description: actionDescriptions[action],
     input_schema: schema as Anthropic.Tool['input_schema'],
   };
 });
 
-// Everything PaePae gets: read tools + gated propose tools.
-export const allPaepaeTools: Anthropic.Tool[] = [...paepaeTools, ...proposeTools];
+// Everything PaePae gets: read tools + action tools.
+export const allPaepaeTools: Anthropic.Tool[] = [...paepaeTools, ...actionTools];
 
-// "propose_create_task" -> "create_task"; null for anything else.
+// "create_task" or "propose_create_invoice" -> the ActionName; null for
+// anything that isn't a write action (read tools, unknown names).
 export function actionFromToolName(toolName: string): ActionName | null {
-  if (!toolName.startsWith(PROPOSE_PREFIX)) return null;
-  const action = toolName.slice(PROPOSE_PREFIX.length);
-  return isActionName(action) ? action : null;
+  const bare = toolName.startsWith(PROPOSE_PREFIX)
+    ? toolName.slice(PROPOSE_PREFIX.length)
+    : toolName;
+  return isActionName(bare) ? bare : null;
 }
 
 type ToolInput = Record<string, unknown>;

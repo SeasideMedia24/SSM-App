@@ -355,9 +355,54 @@ export function ProductionCalculator({
           {initial && (
             <a href="/calculator" className="text-center text-sm text-slate-500 hover:text-slate-700">Cancel editing</a>
           )}
+          {!initial && (
+            <ResetAllButton
+              onReset={() => {
+                // Wipe the whole calculator AND the saved draft — a true blank slate.
+                setS(emptySelections());
+                setClientId('');
+                setProjectId('');
+                setTitle('');
+                try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+              }}
+            />
+          )}
         </div>
       </aside>
     </form>
+  );
+}
+
+// Reset EVERYTHING (selections, client, project, title, and the saved draft).
+// Two-step confirm so one stray click can't wipe a half-built quote.
+function ResetAllButton({ onReset }: { onReset: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+
+  if (!confirming) {
+    return (
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        className="text-center text-sm text-slate-400 transition-colors hover:text-red-600"
+      >
+        Reset calculator
+      </button>
+    );
+  }
+  return (
+    <div className="flex items-center justify-center gap-3 text-sm">
+      <span className="text-slate-500">Clear everything?</span>
+      <button
+        type="button"
+        onClick={() => { onReset(); setConfirming(false); }}
+        className="font-medium text-red-600 hover:underline"
+      >
+        Reset
+      </button>
+      <button type="button" onClick={() => setConfirming(false)} className="text-slate-400 hover:text-slate-600">
+        Cancel
+      </button>
+    </div>
   );
 }
 

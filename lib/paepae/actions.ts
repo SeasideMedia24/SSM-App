@@ -52,8 +52,11 @@ const clientType = z.enum(['recurring', 'one_time', 'campaign']);
 // propose time (where PaePae can correct itself) instead of at execute time.
 
 export const actionSchemas = {
+  // A task can stand alone — attach it to a project and/or client later (or
+  // in the same breath if the owner names one). Mirrors the app's My Tasks.
   create_task: z.strictObject({
-    project_id: uuid,
+    project_id: uuid.optional(),
+    client_id: uuid.optional(),
     title: shortText,
     description: longText.optional(),
     status: taskStatus.optional(),
@@ -63,6 +66,10 @@ export const actionSchemas = {
 
   update_task: z.strictObject({
     task_id: uuid,
+    // A task can be attached to (or detached from) a project/client after the
+    // fact — "add that task to the Rock Jar project" works as an update.
+    project_id: uuid.nullable().optional(),
+    client_id: uuid.nullable().optional(),
     title: shortText.optional(),
     description: longText.nullable().optional(),
     status: taskStatus.optional(),
@@ -151,6 +158,19 @@ export type ActionParams<N extends ActionName> = z.infer<(typeof actionSchemas)[
 
 export function isActionName(v: unknown): v is ActionName {
   return typeof v === 'string' && v in actionSchemas;
+}
+
+// ── Autonomy policy ──────────────────────────────────────────────────────────
+// Owner's rule (2026-07-11): PaePae just DOES most things — create/update tasks,
+// projects, clients, quotes, contracts execute immediately and show a receipt.
+// A confirmation card is reserved for actions with outside-world consequences:
+// invoicing now; sending email, calendar invites, and onboarding links when
+// those integrations arrive. Add any new "send"-like action to this set.
+
+const CONFIRM_ACTIONS: ReadonlySet<ActionName> = new Set<ActionName>(['create_invoice']);
+
+export function requiresConfirmation(action: ActionName): boolean {
+  return CONFIRM_ACTIONS.has(action);
 }
 
 // Shared validation used at BOTH propose time (so PaePae can self-correct) and

@@ -20,9 +20,32 @@ export default async function AppLayout({
     redirect('/login');
   }
 
+  // Notification counts for the menu badges. head:true fetches only counts (no
+  // rows), so this stays cheap. More sources (PaePae updates, team messages)
+  // join this list when messaging lands.
+  const today = new Date().toISOString().slice(0, 10);
+  const [{ count: newInquiries }, { count: overdueTasks }] = await Promise.all([
+    supabase
+      .from('onboarding_submissions')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'new'),
+    supabase
+      .from('tasks')
+      .select('id', { count: 'exact', head: true })
+      .lt('due_date', today)
+      .neq('status', 'done'),
+  ]);
+
+  // Keyed by nav href — the sidebar shows a count pill on matching entries
+  // (and rolls child counts up onto their section).
+  const badges: Record<string, number> = {
+    '/inquiries': newInquiries ?? 0,
+    '/my-tasks': overdueTasks ?? 0,
+  };
+
   return (
     <div className="flex min-h-screen bg-[#f6f9fb]">
-      <Sidebar userEmail={user.email ?? ''} />
+      <Sidebar userEmail={user.email ?? ''} badges={badges} />
       <main className="relative flex-1 overflow-y-auto">
         {/* Thin coastal gradient strip that reaches across the top of the page */}
         <div className="brand-gradient h-1.5 w-full" />
