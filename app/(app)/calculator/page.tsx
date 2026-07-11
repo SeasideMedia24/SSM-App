@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
 import { ProductionCalculator, type QuoteInitial } from '@/components/calculator/production-calculator';
+import { SavedQuotePicker } from '@/components/calculator/saved-quote-picker';
 import { DeleteQuoteButton } from '@/components/calculator/delete-quote-button';
 import { QuoteStatusSelect } from '@/components/calculator/quote-status-select';
 import { ShareQuoteControl } from '@/components/calculator/share-quote-control';
@@ -17,9 +18,9 @@ import type { QuoteStatus } from '@/types/database.types';
 export default async function CalculatorPage({
   searchParams,
 }: {
-  searchParams: Promise<{ quote?: string }>;
+  searchParams: Promise<{ quote?: string; saved?: string }>;
 }) {
-  const { quote: editId } = await searchParams;
+  const { quote: editId, saved } = await searchParams;
   const supabase = await createClient();
 
   const [
@@ -81,6 +82,12 @@ export default async function CalculatorPage({
           </p>
         )}
 
+        {saved === '1' && !initial && (
+          <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+            Quote saved ✓ — it’s in the list below, and on its project’s budget if you linked one.
+          </p>
+        )}
+
         {initial && (
           <p className="rounded-xl bg-aqua/15 px-3 py-2 text-sm text-sea">
             Editing “{initial.title}” — saving will update the existing quote.
@@ -88,15 +95,28 @@ export default async function CalculatorPage({
           </p>
         )}
 
+        {/* Quick-load a past quote into the calculator. */}
+        {!ratesMissing && quotes && quotes.length > 0 && (
+          <SavedQuotePicker
+            quotes={quotes.map((q) => ({
+              id: q.id,
+              title: q.title,
+              client: (q.clients as unknown as { name: string } | null)?.name ?? null,
+            }))}
+            currentId={editId ?? null}
+          />
+        )}
+
         {!ratesMissing && (
           <ProductionCalculator
-            key={initial?.id ?? 'new'}
+            key={initial?.id ?? (saved === '1' ? 'saved' : 'new')}
             clients={clients ?? []}
             projects={projects ?? []}
             roles={roles ?? []}
             services={services ?? []}
             config={config}
             initial={initial}
+            justSaved={saved === '1'}
           />
         )}
 

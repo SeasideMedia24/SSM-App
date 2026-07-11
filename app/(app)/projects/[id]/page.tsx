@@ -6,13 +6,14 @@ import { buttonClass } from '@/components/ui/button-styles';
 import { DeleteProjectButton } from '@/components/projects/delete-project-button';
 import { ViewSwitcher } from '@/components/projects/view-switcher';
 import { TasksPanel } from '@/components/projects/tasks-panel';
-import {
-  DeliverablesPanel, ContractsPanel, ExpensesPanel, BudgetPanel,
-} from '@/components/projects/panels';
+import { DeliverablesPanel, ContractsPanel } from '@/components/projects/panels';
+import { QuoteBudget } from '@/components/projects/quote-budget';
 import { ProjectPriorityControl } from '@/components/projects/priority-picker';
 import { ArchiveControl } from '@/components/projects/archive-control';
 import { projectStatusMeta } from '@/lib/projects/status';
 import { projectTypeLabel } from '@/lib/projects/template';
+import { quoteBudgetRow, type PricingContext } from '@/lib/projects/budget';
+import type { PricingConfig } from '@/lib/pricing/engine';
 
 type ClientRel = { id: string; name: string } | { id: string; name: string }[] | null;
 function client(c: ClientRel): { id: string; name: string } | null {
@@ -37,33 +38,38 @@ export default async function ProjectDetailPage({
   const { data: project } = await supabase.from('projects').select('*, clients(id, name)').eq('id', id).single();
   if (!project) notFound();
 
-  // Fetch everything this project owns (small per project) in parallel.
+  // Fetch everything this project owns (small per project) in parallel. The
+  // budget derives from the project's quotes, so we pull them all plus the
+  // current pricing rates to recompute each quote's cost basis.
   const [
     { data: tasks }, { data: deliverables }, { data: contracts },
-    { data: expenses }, { data: budgetLines }, { data: acceptedQuotes },
+    { data: quotes }, { data: roles }, { data: services }, { data: configRows },
   ] = await Promise.all([
     supabase.from('tasks').select('id, title, status, priority, due_date').eq('project_id', id).order('created_at'),
     supabase.from('deliverables').select('*').eq('project_id', id).order('position'),
     supabase.from('contracts').select('*').eq('project_id', id).order('position'),
-    supabase.from('expenses').select('*').eq('project_id', id).order('spent_on', { ascending: true, nullsFirst: false }),
-    supabase.from('budget_lines').select('*').eq('project_id', id).order('position'),
-    supabase.from('quotes').select('total').eq('project_id', id).eq('status', 'accepted'),
+    supabase.from('quotes').select('id, title, status, total, calculator_state, created_at').eq('project_id', id).order('created_at', { ascending: false }),
+    supabase.from('pricing_roles').select('*').order('sort'),
+    supabase.from('pricing_page_services').select('*').order('sort'),
+    supabase.from('pricing_config').select('*'),
   ]);
 
   const meta = projectStatusMeta(project.status);
   const cl = client(project.clients as ClientRel);
   const taskList = tasks ?? [];
-  const expensesTotal = (expenses ?? []).reduce((s, e) => s + (e.amount ?? 0), 0);
-  const quoteTotal = (acceptedQuotes ?? []).length
-    ? (acceptedQuotes ?? []).reduce((s, q) => s + (q.total ?? 0), 0)
-    : null;
+
+  const pricing: PricingContext = {
+    roles: roles ?? [],
+    services: services ?? [],
+    config: Object.fromEntries((configRows ?? []).map((c) => [c.key, c.value])) as PricingConfig,
+  };
+  const budgetRows = (quotes ?? []).map((q) => quoteBudgetRow(q, pricing));
 
   const counts = {
     tasks: taskList.length,
     deliverables: (deliverables ?? []).length,
     contracts: (contracts ?? []).length,
-    expenses: (expenses ?? []).length,
-    budget: (budgetLines ?? []).length,
+    budget: budgetRows.length,
   };
 
   return (
@@ -107,20 +113,16 @@ export default async function ProjectDetailPage({
       {view === 'tasks' && <TasksPanel projectId={project.id} tasks={taskList} />}
       {view === 'deliverables' && <DeliverablesPanel projectId={project.id} items={deliverables ?? []} />}
       {view === 'contracts' && <ContractsPanel projectId={project.id} items={contracts ?? []} />}
-      {view === 'expenses' && <ExpensesPanel projectId={project.id} items={expenses ?? []} />}
-      {view === 'budget' && (
-        <BudgetPanel projectId={project.id} items={budgetLines ?? []} quoteTotal={quoteTotal} expensesTotal={expensesTotal} />
-      )}
+      {view === 'budget' && <QuoteBudget rows={budgetRows} />}
 
       {view === 'overview' && (
         <div className="space-y-6">
           {/* Clickable stat boxes → jump straight into each view */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatLink id={project.id} view="tasks" label="Tasks" value={counts.tasks} />
             <StatLink id={project.id} view="deliverables" label="Deliverables" value={counts.deliverables} />
             <StatLink id={project.id} view="contracts" label="Contracts" value={counts.contracts} />
-            <StatLink id={project.id} view="expenses" label="Expenses" value={counts.expenses} />
-            <StatLink id={project.id} view="budget" label="Budget" value={counts.budget} />
+            <StatLink id={project.id} view="budget" label="Quotes" value={counts.budget} />
           </div>
           {project.description && (
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

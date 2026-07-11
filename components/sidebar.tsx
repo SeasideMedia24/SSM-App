@@ -15,7 +15,16 @@ type NavItem = { href: string; label: string; icon: React.ReactNode; children?: 
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: <IconGrid /> },
-  { href: '/clients', label: 'Clients', icon: <IconUsers /> },
+  {
+    href: '/clients',
+    label: 'People',
+    icon: <IconUsers />,
+    children: [
+      { href: '/clients', label: 'Clients' },
+      { href: '/contractors', label: 'Team' },
+      { href: '/onboarding', label: 'Onboarding' },
+    ],
+  },
   { href: '/inquiries', label: 'Inquiries', icon: <IconInbox /> },
   {
     href: '/projects',
@@ -25,21 +34,20 @@ const NAV_ITEMS: NavItem[] = [
       { href: '/projects', label: 'Board' },
       { href: '/projects/deliverables', label: 'Deliverables' },
       { href: '/projects/contracts', label: 'Contracts' },
-      { href: '/projects/expenses', label: 'Expenses' },
       { href: '/projects/budget', label: 'Budgets' },
     ],
   },
   { href: '/my-tasks', label: 'My Tasks', icon: <IconCheck /> },
   { href: '/calculator', label: 'Calculator', icon: <IconCalc /> },
   { href: '/invoices', label: 'Invoices', icon: <IconReceipt /> },
-  { href: '/contractors', label: 'Contractors', icon: <IconTeam /> },
   { href: '/settings', label: 'Settings', icon: <IconGear /> },
 ];
 
-// The global-view child paths (used so "Board" isn't marked active on them).
+// Child routes that live UNDER a section index but shouldn't light up that index
+// tab. "Board" (/projects) is active on a project detail page, but not on these
+// cross-project views (which each start with /projects/…).
 const GLOBAL_VIEW_PATHS = [
-  '/projects/deliverables', '/projects/contracts',
-  '/projects/expenses', '/projects/budget',
+  '/projects/deliverables', '/projects/contracts', '/projects/budget',
 ];
 
 export function Sidebar({ userEmail }: { userEmail: string }) {
@@ -106,8 +114,20 @@ function NavLink({ href, icon, label, active }: { href: string; icon: React.Reac
   );
 }
 
+// Whether a child link is the active one. The section-index child (e.g. Board
+// at /projects) is active on detail pages but not on sibling cross-project
+// views; every other child is a plain prefix match.
+function isChildActive(childHref: string, pathname: string): boolean {
+  if (childHref === '/projects') {
+    return pathname === '/projects' || (pathname.startsWith('/projects/') && !GLOBAL_VIEW_PATHS.includes(pathname));
+  }
+  return pathname === childHref || pathname.startsWith(childHref + '/');
+}
+
 function NavGroup({ item, pathname }: { item: NavItem; pathname: string }) {
-  const parentActive = pathname.startsWith(item.href);
+  // The group is highlighted whenever any of its children is active — works for
+  // People (whose pages don't share the parent's URL prefix) and Projects alike.
+  const parentActive = (item.children ?? []).some((c) => isChildActive(c.href, pathname));
   const [open, setOpen] = useState(parentActive);
 
   return (
@@ -123,7 +143,7 @@ function NavGroup({ item, pathname }: { item: NavItem; pathname: string }) {
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          aria-label={open ? 'Collapse Projects' : 'Expand Projects'}
+          aria-label={open ? `Collapse ${item.label}` : `Expand ${item.label}`}
           className="relative z-10 px-2.5 py-2.5 text-white/50 transition-colors hover:text-white"
         >
           <Chevron open={open} />
@@ -140,10 +160,7 @@ function NavGroup({ item, pathname }: { item: NavItem; pathname: string }) {
             className="overflow-hidden"
           >
             {item.children!.map((c) => {
-              const active =
-                c.href === '/projects'
-                  ? pathname === '/projects' || (pathname.startsWith('/projects/') && !GLOBAL_VIEW_PATHS.includes(pathname))
-                  : pathname === c.href;
+              const active = isChildActive(c.href, pathname);
               return (
                 <li key={c.href}>
                   <Link
@@ -235,15 +252,6 @@ function IconReceipt() {
     <svg {...iconProps()}>
       <path d="M4 2v20l2-1.5L8 22l2-1.5L12 22l2-1.5L16 22l2-1.5L20 22V2l-2 1.5L16 2l-2 1.5L12 2l-2 1.5L8 2 6 3.5 4 2Z" />
       <path d="M8 7h8M8 11h8M8 15h5" />
-    </svg>
-  );
-}
-function IconTeam() {
-  return (
-    <svg {...iconProps()}>
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   );
 }

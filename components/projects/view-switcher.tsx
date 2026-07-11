@@ -12,7 +12,6 @@ export const PROJECT_VIEWS = [
   { key: 'tasks', label: 'Tasks' },
   { key: 'deliverables', label: 'Deliverables' },
   { key: 'contracts', label: 'Contracts' },
-  { key: 'expenses', label: 'Expenses' },
   { key: 'budget', label: 'Budget' },
 ] as const;
 

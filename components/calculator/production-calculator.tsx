@@ -6,7 +6,7 @@
 // pure engine the server uses (lib/pricing/engine.ts); on save the server
 // recomputes from database rates, so these numbers are display-only.
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { saveQuote, quickCreateClient, type QuoteFormState } from '@/app/(app)/calculator/actions';
@@ -45,8 +45,15 @@ function SaveButton({ editing }: { editing: boolean }) {
   );
 }
 
+// Where an in-progress (unsaved) quote is stashed so it survives navigating
+// away, editing rates, or closing the app. Only used for brand-new quotes —
+// editing an existing quote is anchored to that saved record, not the draft.
+const DRAFT_KEY = 'ssm-calculator-draft';
+
+type Draft = { clientId: string; projectId: string; title: string; selections: CalculatorSelections };
+
 export function ProductionCalculator({
-  clients, projects, roles, services, config, initial,
+  clients, projects, roles, services, config, initial, justSaved = false,
 }: {
   clients: ClientOption[];
   projects: ProjectOption[];
@@ -54,12 +61,50 @@ export function ProductionCalculator({
   services: PageService[];
   config: PricingConfig;
   initial?: QuoteInitial;
+  justSaved?: boolean;
 }) {
+  const editing = !!initial;
   const [state, action] = useActionState<QuoteFormState, FormData>(saveQuote, { error: null });
   const [clientId, setClientId] = useState(initial?.client_id ?? '');
+  const [projectId, setProjectId] = useState(initial?.project_id ?? '');
+  const [title, setTitle] = useState(initial?.title ?? '');
   // Clients are seeded from the server but can grow via quick-add below.
   const [clientList, setClientList] = useState<ClientOption[]>(clients);
   const [s, setS] = useState<CalculatorSelections>(() => initial?.selections ?? emptySelections());
+
+  // Draft persistence (new quotes only). We hydrate after mount — localStorage
+  // isn't available during server rendering, so reading it in a useState
+  // initializer would cause a hydration mismatch.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    if (editing) { setHydrated(true); return; }
+    if (justSaved) {
+      // The quote we were working on just saved — start fresh.
+      try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+      setHydrated(true);
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const d = JSON.parse(raw) as Partial<Draft>;
+        if (d.clientId) setClientId(d.clientId);
+        if (d.projectId) setProjectId(d.projectId);
+        if (typeof d.title === 'string') setTitle(d.title);
+        if (d.selections) setS(d.selections);
+      }
+    } catch { /* ignore malformed draft */ }
+    setHydrated(true);
+  }, [editing, justSaved]);
+
+  // Persist the working state as it changes (new quotes only, after hydration so
+  // we don't clobber a saved draft with the empty initial state).
+  useEffect(() => {
+    if (editing || !hydrated) return;
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ clientId, projectId, title, selections: s } satisfies Draft));
+    } catch { /* quota/private mode — non-fatal */ }
+  }, [editing, hydrated, clientId, projectId, title, s]);
 
   const clientProjects = useMemo(() => projects.filter((p) => p.client_id === clientId), [projects, clientId]);
   const preServices = services.filter((x) => x.phase === 'pre');
@@ -116,7 +161,13 @@ export function ProductionCalculator({
         <Card title="Quote">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Labeled label="Client" required>
-              <select name="client_id" required value={clientId} onChange={(e) => setClientId(e.target.value)} className={field}>
+              <select
+                name="client_id"
+                required
+                value={clientId}
+                onChange={(e) => { setClientId(e.target.value); setProjectId(''); }}
+                className={field}
+              >
                 <option value="">Choose a client…</option>
                 {clientList.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}{c.company ? ` — ${c.company}` : ''}</option>
@@ -126,17 +177,18 @@ export function ProductionCalculator({
                 onCreated={(c) => {
                   setClientList((prev) => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)));
                   setClientId(c.id);
+                  setProjectId('');
                 }}
               />
             </Labeled>
             <Labeled label="Project (optional)">
-              <select name="project_id" defaultValue={initial?.project_id ?? ''} className={field} disabled={!clientId}>
+              <select name="project_id" value={projectId} onChange={(e) => setProjectId(e.target.value)} className={field} disabled={!clientId}>
                 <option value="">No project</option>
                 {clientProjects.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
               </select>
             </Labeled>
             <Labeled label="Quote title" required>
-              <input name="title" required defaultValue={initial?.title ?? ''} placeholder="e.g. Brand film — production" className={field} />
+              <input name="title" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Brand film — production" className={field} />
             </Labeled>
           </div>
         </Card>

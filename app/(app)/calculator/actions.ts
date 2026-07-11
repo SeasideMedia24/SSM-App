@@ -97,7 +97,16 @@ export async function saveQuote(_prev: QuoteFormState, formData: FormData): Prom
   revalidatePath('/calculator');
   revalidatePath('/dashboard');
   revalidatePath(`/clients/${values.client_id}`);
-  redirect('/calculator');
+  // A quote feeds its project's budget, so refresh those views too — otherwise a
+  // newly-saved quote wouldn't show up under the project until something else
+  // revalidated it.
+  if (values.project_id) {
+    revalidatePath(`/projects/${values.project_id}`);
+    revalidatePath('/projects/budget');
+  }
+  // ?saved=1 lets the calculator confirm the save and clear its local draft so
+  // the next quote starts from a clean slate.
+  redirect('/calculator?saved=1');
 }
 
 // Quick-add a client straight from the calculator, for when someone calls

@@ -22,6 +22,51 @@ const clean = (v: string | undefined) => (v && v.trim() !== '' ? v.trim() : null
 const keep = (current: string | null, incoming: string | null) =>
   current && current.trim() !== '' ? current : incoming;
 
+// Generic self-serve intake (no token): a brand-new team member adds themselves
+// from the public /contractor-onboard link. Creates a new contractor record,
+// already marked onboarded. Uses the admin client because the visitor is
+// anonymous. Kept minimal — the owner can flesh out type/role later.
+const intakeSchema = z.object({
+  name: z.string().trim().min(1, 'Please enter your name').max(200),
+  email: z.union([z.literal(''), z.string().trim().email('Enter a valid email')]).optional(),
+  phone: z.string().trim().max(50).optional(),
+  role: z.string().trim().max(200).optional(),
+});
+
+export async function submitContractorIntake(
+  _prev: ContractorOnboardState,
+  formData: FormData,
+): Promise<ContractorOnboardState> {
+  // Honeypot: real people leave this hidden field empty.
+  if (String(formData.get('website') ?? '').trim() !== '') return { ok: true, error: null };
+
+  const parsed = intakeSchema.safeParse({
+    name: formData.get('name'),
+    email: formData.get('email'),
+    phone: formData.get('phone'),
+    role: formData.get('role'),
+  });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Please check the form and try again.' };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin.from('contractors').insert({
+    name: parsed.data.name.trim(),
+    type: 'external',
+    email: clean(parsed.data.email),
+    phone: clean(parsed.data.phone),
+    role: clean(parsed.data.role),
+    rate_full: parseRate(formData.get('rate_full')),
+    rate_half: parseRate(formData.get('rate_half')),
+    rate_hourly: parseRate(formData.get('rate_hourly')),
+    onboarded_at: new Date().toISOString(),
+  });
+  if (error) return { ok: false, error: 'Something went wrong saving your details. Please try again.' };
+
+  return { ok: true, error: null };
+}
+
 export async function submitContractorOnboarding(
   _prev: ContractorOnboardState,
   formData: FormData,
