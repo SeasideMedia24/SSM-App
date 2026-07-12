@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
 import { InvoiceStatusSelect } from '@/components/invoices/invoice-status-select';
 import { DeleteInvoiceButton } from '@/components/invoices/delete-invoice-button';
+import { ShareInvoiceControl } from '@/components/invoices/share-invoice-control';
 import { updateInvoiceDueDate } from '../actions';
 import { money, fmtDate } from '@/lib/projects/format';
 import type { InvoiceStatus } from '@/types/database.types';
@@ -41,13 +42,18 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         action={<DeleteInvoiceButton invoiceId={invoice.id} />}
       />
 
-      <div className="-mt-3 mb-6 flex flex-wrap items-center gap-3 text-sm">
+      <div className="-mt-3 mb-4 flex flex-wrap items-center gap-3 text-sm">
         <InvoiceStatusSelect invoiceId={invoice.id} status={invoice.status as InvoiceStatus} />
         {client?.name && <Link href={`/clients/${client.id}`} className="text-slate-600 hover:text-sea hover:underline">{client.name}</Link>}
         {project?.title && <Link href={`/projects/${project.id}`} className="text-slate-500 hover:text-sea hover:underline">{project.title}</Link>}
         {invoice.quote_id && (
           <Link href={`/calculator?quote=${invoice.quote_id}`} className="text-xs text-slate-400 hover:text-sea hover:underline">from quote</Link>
         )}
+      </div>
+
+      {/* Client-facing document: create/copy the private link, or open to print. */}
+      <div className="mb-6">
+        <ShareInvoiceControl invoiceId={invoice.id} token={(invoice.share_token as string | null) ?? null} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_16rem]">

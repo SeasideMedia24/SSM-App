@@ -314,6 +314,7 @@ export type Database = {
           due_date: string | null;
           sent_at: string | null;
           paid_at: string | null;
+          share_token: string | null;
           created_at: string;
         };
         Insert: {
@@ -331,6 +332,7 @@ export type Database = {
           due_date?: string | null;
           sent_at?: string | null;
           paid_at?: string | null;
+          share_token?: string | null;
           created_at?: string;
         };
         Update: {
@@ -348,6 +350,7 @@ export type Database = {
           due_date?: string | null;
           sent_at?: string | null;
           paid_at?: string | null;
+          share_token?: string | null;
           created_at?: string;
         };
         Relationships: [

@@ -67,3 +67,41 @@ export async function deleteInvoice(formData: FormData) {
   revalidatePath('/dashboard');
   redirect('/invoices');
 }
+
+// ── Share links (private, unguessable) ──────────────────────────────────────
+// Mirrors quote sharing: a fresh random token replaces (and so invalidates) any
+// previously sent link. These return a result object so the UI can show a
+// helpful message when the share_token migration hasn't been applied yet.
+
+export type ShareResult = { ok: true; token: string | null } | { ok: false; error: string };
+
+const MIGRATION_HINT =
+  'Share links need a quick database update — run supabase/migrations/20260711000002_invoice_share.sql in the Supabase SQL Editor, then try again.';
+
+export async function generateInvoiceShareToken(invoiceId: string): Promise<ShareResult> {
+  if (typeof invoiceId !== 'string' || invoiceId.length === 0) {
+    return { ok: false, error: 'Missing invoice.' };
+  }
+  const supabase = await createSupabaseServer();
+  const token = crypto.randomUUID();
+  const { error } = await supabase.from('invoices').update({ share_token: token }).eq('id', invoiceId);
+  if (error) {
+    // 42703 = column doesn't exist yet (migration not applied).
+    return { ok: false, error: error.code === '42703' ? MIGRATION_HINT : 'Could not create the link. Please try again.' };
+  }
+  revalidatePath(`/invoices/${invoiceId}`);
+  return { ok: true, token };
+}
+
+export async function revokeInvoiceShareToken(invoiceId: string): Promise<ShareResult> {
+  if (typeof invoiceId !== 'string' || invoiceId.length === 0) {
+    return { ok: false, error: 'Missing invoice.' };
+  }
+  const supabase = await createSupabaseServer();
+  const { error } = await supabase.from('invoices').update({ share_token: null }).eq('id', invoiceId);
+  if (error) {
+    return { ok: false, error: error.code === '42703' ? MIGRATION_HINT : 'Could not turn the link off. Please try again.' };
+  }
+  revalidatePath(`/invoices/${invoiceId}`);
+  return { ok: true, token: null };
+}
