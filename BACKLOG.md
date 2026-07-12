@@ -24,29 +24,32 @@ draft contracts. (Details under "Recently shipped".)
 5. ✅ **PaePae tasks without a project** — create_task takes optional project/client; update_task can attach/detach later.
 6. ✅ **Dashboard calendar** — shipped 2026-07-11 in two passes: (a) month grid of tasks/projects/milestones/deliverables; (b) full rebuild — Apple-style month view, Week + Day views with an all-day strip and 12 AM–11:59 PM time grid, source tabs (Seaside Media / Personal / Everything), and read-only Google Calendar sync (OAuth connect in Settings, per-calendar include toggles, migration 20260711000001). Owner still to do: Google Cloud credentials + run the migration. Event BOOKING stays in item 3.
 7. ✅ **Menu: Inquiries under People + notification badges** — red count pills (new inquiries on Inquiries/People, overdue tasks on My Tasks); PaePae updates and team messages join once messaging exists.
-8. **Internal messaging (clients + team chat in-app)** — depends on real multi-user logins (Contractors Slice B / client accounts). Plan it together with that security work.
+8. **Internal messaging (clients + team chat in-app)** — depends on real multi-user logins. The prerequisite plan is now written: **docs/CONTRACTOR-LOGINS-PLAN.md** (Contractors Slice B). Owner answers its 4 questions → we build B1 → messaging follows on top.
 
 ---
 
 ## 🗺️ Next up
 
-- **Contractors — Slice B (security-critical, needs its own plan)**: contractor
-  **logins** + role-based RLS so a contractor sees only their own assignments and
-  rate. (Self-service profile onboarding via link is already done — this is just
-  the accounts + permission model.) The `contractors.user_id` column is in place.
-  This is the real multi-user surface — plan and review it deliberately.
+- **Contractors — Slice B: ✍️ PLAN WRITTEN, awaiting owner's 4 answers** —
+  see **docs/CONTRACTOR-LOGINS-PLAN.md** (scope table, RLS rewrite, invite flow
+  via Supabase's own auth emails, test gate). Answer §5 and B1 builds in one go.
 - **Contractors — nice-to-haves**: show a project's assigned team on the project
   page; roll assignment costs into the project budget.
-- **App-wide niceties**: CMD-Z undo, a back button, remember-my-view state.
-- **Invoices polish** (later): a printable/sendable invoice layout (like the shareable
-  quote link), and editing an invoice's line items after generation.
+- **App-wide niceties**: ✅ CMD-Z undo v1 (2026-07-12: board drags + task/
+  deliverable/milestone status flips, with an undo toast; deletes excluded on
+  purpose). Still open: a back button, remember-my-view state, undo on more
+  action types.
+- **Invoices polish**: ✅ printable/sendable layout (2026-07-12: /invoice/<token>
+  private share link + print-to-PDF, migration 20260711000002 — run when
+  convenient; the button explains itself until then). Still open: editing an
+  invoice's line items after generation.
 
 ---
 
 ## 🧵 Loose ends (smaller, from earlier lists)
 
-- Projects → Contracts: a **"Create new"** contract button.
-- **Edit a project's description** (the one created from the inquiry).
+- ✅ Projects → Contracts: "New contract" button on the global page (project picker + name/amount/signed date). (2026-07-12)
+- ✅ Edit a project's description — already existed via Edit project; verified and ticked. 
 - Create an **inquiry directly from the quote screen** (client quick-add is in the current batch).
 - My Tasks: attach to "other board related items" beyond project/client.
 - Re-create the **Jared Stanton** client (owner is doing this manually; the merge with Paige Moore is not auto-repaired).
@@ -54,6 +57,11 @@ draft contracts. (Details under "Recently shipped".)
 ---
 
 ## ✅ Recently shipped
+
+- Invoices: printable client-facing document at a private share link (/invoice/<token>), print/save-PDF, share control with create/copy/replace/revoke. (2026-07-12, migration 20260711000002 pending on the owner.)
+- CMD-Z undo v1: app-wide ⌘Z + undo toast for board drags and task/deliverable/milestone status changes. (2026-07-12)
+- Contracts: "New contract" straight from the global Contracts page. (2026-07-12)
+- Contractors Slice B: full security plan written — docs/CONTRACTOR-LOGINS-PLAN.md. (2026-07-12)
 
 - PaePae full visibility + expanded hands (2026-07-11): new read tools (team/contractors, invoices, deliverables, milestones, inquiries); briefing now includes overdue invoices + new-inquiry count; new AUTO actions — create/update deliverables & milestones, assign a team member to a project, update contracts, and RECORD quote/invoice statuses (only when the owner says the event happened; timestamps kept in step). Confirm gate still on invoicing only.
 
