@@ -8,6 +8,7 @@ import { useFormStatus } from 'react-dom';
 import { addTask, setTaskStatus, deleteTask, type TaskFormState } from '@/app/(app)/tasks/actions';
 import { TASK_STATUSES, TASK_PRIORITIES, taskPriorityMeta } from '@/lib/projects/status';
 import { Button } from '@/components/ui/button';
+import { useUndo } from '@/components/undo/undo-provider';
 import type { Database, TaskStatus } from '@/types/database.types';
 
 type TaskItem = Pick<
@@ -86,17 +87,27 @@ function AddTaskForm({ projectId }: { projectId: string }) {
 function TaskRow({ task, projectId }: { task: TaskItem; projectId: string }) {
   const [pending, start] = useTransition();
   const [confirming, setConfirming] = useState(false);
+  const undo = useUndo();
   const prio = taskPriorityMeta(task.priority);
   const due = task.due_date
     ? new Date(task.due_date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
     : null;
+
+  function changeStatus(next: TaskStatus) {
+    const prev = task.status;
+    start(() => setTaskStatus(task.id, projectId, next));
+    undo.register({
+      label: `Marked “${task.title}” ${TASK_STATUSES.find((s) => s.value === next)?.label ?? next}`,
+      undo: () => setTaskStatus(task.id, projectId, prev),
+    });
+  }
 
   return (
     <li className="flex items-center gap-3 px-3 py-2.5">
       <select
         value={task.status}
         disabled={pending}
-        onChange={(e) => start(() => setTaskStatus(task.id, projectId, e.target.value as TaskStatus))}
+        onChange={(e) => changeStatus(e.target.value as TaskStatus)}
         className="rounded-md border border-slate-200 bg-white px-1.5 py-1 text-xs text-slate-600 outline-none focus:border-teal"
         aria-label="Task status"
       >

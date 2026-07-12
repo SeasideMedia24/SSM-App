@@ -7,6 +7,7 @@
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
+import { useUndo } from '@/components/undo/undo-provider';
 import { TASK_STATUSES, CONTRACT_STATUSES } from '@/lib/projects/status';
 import { money, fmtDate } from '@/lib/projects/format';
 import {
@@ -136,10 +137,21 @@ function StatusRow({ id, projectId, title, status, due, onStatus, onDelete }: {
   onStatus: (id: string, projectId: string, s: TaskStatus) => void; onDelete: (f: FormData) => void;
 }) {
   const [pending, start] = useTransition();
+  const undo = useUndo();
   const d = fmtDate(due);
+
+  function changeStatus(next: TaskStatus) {
+    const prev = status;
+    start(() => onStatus(id, projectId, next));
+    undo.register({
+      label: `Marked “${title}” ${TASK_STATUSES.find((s) => s.value === next)?.label ?? next}`,
+      undo: () => onStatus(id, projectId, prev),
+    });
+  }
+
   return (
     <li className="flex items-center gap-3 px-3 py-2.5">
-      <StatusSelect value={status} disabled={pending} onChange={(s) => start(() => onStatus(id, projectId, s))} />
+      <StatusSelect value={status} disabled={pending} onChange={changeStatus} />
       <span className={`flex-1 text-sm ${status === 'done' ? 'text-slate-400 line-through' : 'text-ink'}`}>{title}</span>
       {d && <span className="text-[11px] text-slate-400">{d}</span>}
       <DeleteInline action={onDelete} id={id} projectId={projectId} />

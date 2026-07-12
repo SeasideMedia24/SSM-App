@@ -23,8 +23,10 @@ import { compareProjects } from '@/lib/projects/sort';
 import { moveProject } from '@/app/(app)/projects/actions';
 import type { ProjectStatus } from '@/types/database.types';
 import { ProjectCard, CardBody, type BoardProject } from './project-card';
+import { useUndo } from '@/components/undo/undo-provider';
 
 export function ProjectBoard({ initial }: { initial: BoardProject[] }) {
+  const undo = useUndo();
   const [projects, setProjects] = useState(initial);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
@@ -49,8 +51,18 @@ export function ProjectBoard({ initial }: { initial: BoardProject[] }) {
     const newStatus = String(over.id) as ProjectStatus;
     const proj = projects.find((p) => p.id === String(active.id));
     if (!proj || proj.status === newStatus) return;
+    const prevStatus = proj.status;
     setProjects((prev) => prev.map((p) => (p.id === proj.id ? { ...p, status: newStatus } : p)));
     void moveProject(proj.id, newStatus);
+    // ⌘Z: send the card back where it was — server AND local optimistic state.
+    const label = PROJECT_STATUSES.find((c) => c.value === newStatus)?.label ?? newStatus;
+    undo.register({
+      label: `Moved “${proj.title}” to ${label}`,
+      undo: async () => {
+        await moveProject(proj.id, prevStatus);
+        setProjects((prev) => prev.map((p) => (p.id === proj.id ? { ...p, status: prevStatus } : p)));
+      },
+    });
   }
 
   return (
