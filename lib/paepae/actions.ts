@@ -19,6 +19,7 @@ import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database.types';
 import { createInvoiceFromQuoteId } from '@/lib/invoices/create';
+import { sendGmail, createCalendarEvent } from '@/lib/google/act';
 
 type DB = SupabaseClient<Database>;
 
@@ -214,6 +215,29 @@ export const actionSchemas = {
     invoice_id: uuid,
     status: invoiceStatus,
   }),
+
+  // ── Outside-world actions (Phase 3) ── always behind a Confirm card. ──────
+  // Sent through the owner's connected Google account (Settings → Google
+  // Calendar). Nothing leaves the studio without an explicit Confirm click.
+
+  send_email: z.strictObject({
+    to: z.email(),
+    cc: z.array(z.email()).max(10).optional(),
+    subject: shortText,
+    body: z.string().trim().min(1).max(20000),
+  }),
+
+  create_event: z.strictObject({
+    title: shortText,
+    description: longText.optional(),
+    location: shortText.optional(),
+    // Local wall-clock times in time_zone, e.g. 2026-07-15T14:00.
+    start: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, 'Expected YYYY-MM-DDTHH:MM'),
+    end: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, 'Expected YYYY-MM-DDTHH:MM'),
+    time_zone: shortText.optional(), // IANA name; defaults to America/New_York
+    attendees: z.array(z.email()).max(20).optional(),
+    with_meet: z.boolean().optional(), // default true — include a Google Meet link
+  }),
 } as const;
 
 export type ActionName = keyof typeof actionSchemas;
@@ -230,7 +254,11 @@ export function isActionName(v: unknown): v is ActionName {
 // invoicing now; sending email, calendar invites, and onboarding links when
 // those integrations arrive. Add any new "send"-like action to this set.
 
-const CONFIRM_ACTIONS: ReadonlySet<ActionName> = new Set<ActionName>(['create_invoice']);
+const CONFIRM_ACTIONS: ReadonlySet<ActionName> = new Set<ActionName>([
+  'create_invoice',
+  'send_email',
+  'create_event',
+]);
 
 export function requiresConfirmation(action: ActionName): boolean {
   return CONFIRM_ACTIONS.has(action);
@@ -251,6 +279,11 @@ export function validateAction(
   // Updates must actually change something (beyond the id field).
   if (action.startsWith('update_') && Object.keys(parsed.data).length <= 1) {
     return { ok: false, error: 'Provide at least one field to change.' };
+  }
+  // Events must end after they start (same string format → safe to compare).
+  if (action === 'create_event') {
+    const p = parsed.data as ActionParams<'create_event'>;
+    if (p.end <= p.start) return { ok: false, error: 'The end time must be after the start time.' };
   }
   return { ok: true, params: parsed.data as Record<string, unknown> };
 }
@@ -328,6 +361,7 @@ export async function buildProposal(
   const skip = new Set([
     'project_id', 'client_id', 'task_id', 'quote_id', 'line_items',
     'deliverable_id', 'milestone_id', 'contractor_id', 'invoice_id', 'contract_id',
+    'body', 'attendees', 'with_meet', // formatted specially below
   ]);
 
   // Resolve IDs to names AND verify they exist. A missing one aborts the card.
@@ -451,6 +485,22 @@ export async function buildProposal(
       );
     }
     lines.push(`Total: $${subtotal.toLocaleString()} (saved as a draft)`);
+  }
+
+  // Outside-world actions get explicit, no-surprises cards.
+  if (action === 'send_email') {
+    const body = String(params.body ?? '');
+    lines.push(`Body: ${body.length > 200 ? `${body.slice(0, 200)}…` : body}`);
+    lines.push('Sends from your connected Gmail the moment you Confirm.');
+  }
+  if (action === 'create_event') {
+    const attendees = Array.isArray(params.attendees) ? (params.attendees as string[]) : [];
+    lines.push(
+      attendees.length > 0
+        ? `Invites: ${attendees.join(', ')} (emailed by Google on Confirm)`
+        : 'No attendees — goes on your calendar only.',
+    );
+    if (params.with_meet !== false) lines.push('Includes a Google Meet link.');
   }
 
   return { ok: true, proposal: { action, params, summary: lines } };
@@ -697,6 +747,31 @@ export async function executeAction(
       if (error) throw friendlyError(error);
       return `Marked invoice ${data.invoice_number ? `${data.invoice_number} ` : ''}“${data.title}” as ${p.status}.`;
     }
+
+    // Outside-world actions — only reachable after the owner's Confirm click
+    // (both are in CONFIRM_ACTIONS), sent via the connected Google account.
+    case 'send_email': {
+      const p = parsed.data as ActionParams<'send_email'>;
+      const result = await sendGmail(supabase, { to: p.to, cc: p.cc, subject: p.subject, body: p.body });
+      if (!result.ok) throw new Error(result.error);
+      return result.detail;
+    }
+
+    case 'create_event': {
+      const p = parsed.data as ActionParams<'create_event'>;
+      const result = await createCalendarEvent(supabase, {
+        title: p.title,
+        description: p.description,
+        location: p.location,
+        start: p.start,
+        end: p.end,
+        timeZone: p.time_zone ?? 'America/New_York', // the studio's home zone
+        attendees: p.attendees ?? [],
+        withMeet: p.with_meet !== false,
+      });
+      if (!result.ok) throw new Error(result.error);
+      return result.detail;
+    }
   }
 }
 
@@ -730,5 +805,9 @@ export function pathsToRevalidate(action: ActionName): string[] {
       return ['/contractors', '/projects'];
     case 'update_quote_status':
       return ['/calculator', '/dashboard'];
+    case 'send_email':
+      return [];
+    case 'create_event':
+      return ['/dashboard']; // the calendar block shows the new event
   }
 }

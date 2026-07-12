@@ -228,9 +228,12 @@ describe('action name helpers', () => {
 });
 
 describe('autonomy policy (owner, 2026-07-11)', () => {
-  it('only invoicing requires confirmation; everything else is auto', () => {
+  // "Outside-world" actions need a Confirm click; everything else is auto.
+  const GATED: ActionName[] = ['create_invoice', 'send_email', 'create_event'];
+
+  it('gates exactly the outside-world actions; everything else is auto', () => {
     for (const name of Object.keys(actionSchemas) as ActionName[]) {
-      expect(requiresConfirmation(name)).toBe(name === 'create_invoice');
+      expect(requiresConfirmation(name)).toBe(GATED.includes(name));
     }
   });
 
@@ -285,13 +288,38 @@ describe('expanded action schemas', () => {
     expect(validateAction('assign_contractor', { project_id: PID, contractor_id: CID, rate: -5 }).ok).toBe(false);
   });
 
-  it('keeps the confirm gate ONLY on invoicing', () => {
+  it('keeps the confirm gate on the outside-world actions only', () => {
     const gated = (Object.keys(actionSchemas) as ActionName[]).filter(requiresConfirmation);
-    expect(gated).toEqual(['create_invoice']);
+    expect(gated.sort()).toEqual(['create_event', 'create_invoice', 'send_email']);
     // Gated tools keep the propose_ prefix; auto tools use the bare name.
     expect(toolNameFor('create_invoice')).toBe('propose_create_invoice');
+    expect(toolNameFor('send_email')).toBe('propose_send_email');
+    expect(toolNameFor('create_event')).toBe('propose_create_event');
     expect(toolNameFor('update_invoice_status')).toBe('update_invoice_status');
     expect(actionFromToolName('propose_create_invoice')).toBe('create_invoice');
     expect(actionFromToolName('assign_contractor')).toBe('assign_contractor');
+  });
+});
+
+// ── Outside-world actions (Phase 3: Gmail + Google Calendar) ────────────────
+
+describe('send_email / create_event schemas', () => {
+  it('validates a complete email and rejects a bad address', () => {
+    expect(
+      validateAction('send_email', { to: 'client@example.com', subject: 'Hi', body: 'Hello there' }).ok,
+    ).toBe(true);
+    expect(validateAction('send_email', { to: 'not-an-email', subject: 'Hi', body: 'x' }).ok).toBe(false);
+    expect(validateAction('send_email', { to: 'client@example.com', subject: 'Hi' }).ok).toBe(false);
+  });
+
+  it('validates event times and requires end after start', () => {
+    const base = { title: 'Kickoff call', attendees: ['client@example.com'] };
+    expect(
+      validateAction('create_event', { ...base, start: '2026-07-15T14:00', end: '2026-07-15T14:30' }).ok,
+    ).toBe(true);
+    expect(
+      validateAction('create_event', { ...base, start: '2026-07-15T14:30', end: '2026-07-15T14:00' }).ok,
+    ).toBe(false);
+    expect(validateAction('create_event', { ...base, start: 'tomorrow 2pm', end: '3pm' }).ok).toBe(false);
   });
 });

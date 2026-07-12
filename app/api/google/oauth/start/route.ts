@@ -28,7 +28,19 @@ export async function GET(req: NextRequest) {
   consent.searchParams.set('redirect_uri', redirectUri);
   consent.searchParams.set('response_type', 'code');
   // openid+email lets Settings show WHICH Google account is connected.
-  consent.searchParams.set('scope', 'openid email https://www.googleapis.com/auth/calendar.readonly');
+  // calendar.readonly feeds the dashboard calendar; calendar.events and
+  // gmail.send power PaePae's book-a-meeting / send-an-email proposals (each
+  // one still requires the owner's Confirm click before anything goes out).
+  consent.searchParams.set(
+    'scope',
+    [
+      'openid',
+      'email',
+      'https://www.googleapis.com/auth/calendar.readonly',
+      'https://www.googleapis.com/auth/calendar.events',
+      'https://www.googleapis.com/auth/gmail.send',
+    ].join(' '),
+  );
   consent.searchParams.set('access_type', 'offline'); // we need a refresh token
   consent.searchParams.set('prompt', 'consent'); // always re-issue the refresh token
   consent.searchParams.set('state', state);

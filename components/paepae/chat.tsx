@@ -57,6 +57,8 @@ const ACTION_TITLES: Record<string, string> = {
   update_contract: 'Update contract',
   update_quote_status: 'Record quote status',
   update_invoice_status: 'Record invoice status',
+  send_email: 'Send email',
+  create_event: 'Book meeting',
 };
 
 // Starter prompts for the empty state — tuned to what PaePae can actually do.

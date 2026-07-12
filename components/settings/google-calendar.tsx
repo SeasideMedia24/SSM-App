@@ -81,6 +81,14 @@ export function GoogleCalendarSettings({
               Connected as <span className="font-medium text-ink">{connectedEmail ?? 'your Google account'}</span>{' '}
               <span className="text-xs text-emerald-600">✓ read-only</span>
             </p>
+            {/* Re-runs the consent flow — needed once after new powers (email
+                sending / meeting booking) are added, and harmless any time. */}
+            <a
+              href="/api/google/oauth/start"
+              className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:border-teal hover:text-sea"
+            >
+              Update permissions
+            </a>
             {confirmingDisconnect ? (
               <span className="flex items-center gap-2 text-sm">
                 <span className="text-slate-500">Disconnect and forget the tokens?</span>

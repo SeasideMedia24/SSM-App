@@ -219,6 +219,10 @@ const actionDescriptions: Record<ActionName, string> = {
     'Record a quote\'s real-world status immediately (draft/sent/accepted/declined). ONLY use this when the owner explicitly says it happened (e.g. "mark the Acme quote accepted — they said yes"); you cannot send quotes yourself. Look the quote up first (list_quotes).',
   update_invoice_status:
     'Record an invoice\'s real-world status immediately (draft/sent/paid) — bookkeeping timestamps are kept in step automatically. ONLY use this when the owner explicitly says it happened; you cannot send invoices yourself. Look the invoice up first (list_invoices).',
+  send_email:
+    'Propose sending a real email from the owner\'s connected Gmail. Shows a confirmation card with recipient, subject, and body — NOTHING sends until the owner clicks Confirm. Use the real recipient address (look the client up with list_clients); never invent one. Write the full body ready to send.',
+  create_event:
+    'Propose booking a real Google Calendar event (with a Google Meet link by default). Shows a confirmation card — nothing is booked until the owner clicks Confirm; on Confirm, Google emails invites to any attendees. Times are local wall-clock (YYYY-MM-DDTHH:MM) in time_zone (default America/New_York). Look up attendee emails (list_clients/list_contractors); never guess an address.',
 };
 
 // "create_task" for auto actions; "propose_create_invoice" for gated ones.

@@ -85,6 +85,26 @@ async function accessTokenFor(supabase: DB, account: Account): Promise<string | 
   return json.access_token;
 }
 
+// A ready-to-use access token for other Google modules (lib/google/act.ts).
+// Distinguishes "never connected" from "connection broken" so callers can give
+// the right instruction.
+export async function googleAccessToken(
+  supabase: DB,
+): Promise<{ ok: true; token: string } | { ok: false; error: string }> {
+  if (!googleConfigured()) {
+    return { ok: false, error: 'Google isn’t configured on the server (missing GOOGLE_CLIENT_ID/SECRET).' };
+  }
+  const account = await getGoogleAccount(supabase);
+  if (!account) {
+    return { ok: false, error: 'Google isn’t connected yet — connect it in Settings → Google Calendar.' };
+  }
+  const token = await accessTokenFor(supabase, account);
+  if (!token) {
+    return { ok: false, error: 'Google rejected the saved connection — reconnect it in Settings → Google Calendar.' };
+  }
+  return { ok: true, token };
+}
+
 // ── Calendar list ────────────────────────────────────────────────────────────
 
 // Pull the user's calendar list from Google and mirror it into
