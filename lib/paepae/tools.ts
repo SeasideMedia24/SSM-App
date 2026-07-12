@@ -18,6 +18,7 @@ import type {
   ProjectStatus,
   TaskStatus,
   QuoteStatus,
+  InvoiceStatus,
 } from '@/types/database.types';
 import { actionSchemas, type ActionName, isActionName, requiresConfirmation } from './actions';
 import { getBriefing } from './briefing';
@@ -38,6 +39,9 @@ const PROJECT_STATUSES: readonly ProjectStatus[] = [
 ];
 const TASK_STATUSES: readonly TaskStatus[] = ['not_started', 'in_progress', 'done'];
 const QUOTE_STATUSES: readonly QuoteStatus[] = ['draft', 'sent', 'accepted', 'declined'];
+const INVOICE_STATUSES: readonly InvoiceStatus[] = ['draft', 'sent', 'paid'];
+// Inquiry status is a plain-text column; these are the values the app writes.
+const INQUIRY_STATUSES = ['new', 'reviewed', 'archived'] as const;
 
 // Tool definitions handed to the Claude API. Descriptions are prescriptive about
 // *when* to call each one — recent models reach for tools more deliberately, so
@@ -46,7 +50,7 @@ export const paepaeTools: Anthropic.Tool[] = [
   {
     name: 'get_briefing',
     description:
-      "Get one snapshot of what needs attention right now: overdue tasks, tasks due in the next 7 days, the active project pipeline (count per stage), and quotes needing attention (drafts not yet sent, and quotes sent but awaiting a reply). Call this FIRST — a single call — whenever Jeremy asks for a summary, a digest, a daily or weekly rundown, 'what needs my attention', or 'what's going on', instead of stitching together list_tasks/list_projects/list_quotes yourself.",
+      "Get one snapshot of what needs attention right now: overdue tasks, tasks due in the next 7 days, the active project pipeline (count per stage), quotes needing attention (drafts not yet sent, and sent quotes awaiting a reply), overdue invoices (sent and past due), and the count of new inquiries awaiting review. Call this FIRST — a single call — whenever Jeremy asks for a summary, a digest, a daily or weekly rundown, 'what needs my attention', or 'what's going on', instead of stitching together the list_* tools yourself.",
     input_schema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
@@ -105,6 +109,64 @@ export const paepaeTools: Anthropic.Tool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'list_contractors',
+    description:
+      'List the team — contractors and employees — with their type, role, contact details, day/half-day/hourly rates, and how many projects each is assigned to. Call this for anything about who is on the team, crew availability, rates, or before assigning someone to a project.',
+    input_schema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'list_invoices',
+    description:
+      'List invoices with their client, status (draft/sent/paid), total, and due date. Call this for anything about billing, unpaid or overdue invoices, or money owed. Optionally filter by status.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          description: 'Optional status filter. One of: draft, sent, paid.',
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'list_deliverables',
+    description:
+      'List deliverables with their project, status, and due date. Call this for anything about what the studio owes clients, or before updating a deliverable. Optionally filter by project or status.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'string', description: 'Optional project id to limit to one project.' },
+        status: { type: 'string', description: 'Optional status filter. One of: not_started, in_progress, done.' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'list_milestones',
+    description:
+      'List milestones with their project, status, and date. Call this for schedule questions or before updating a milestone. Optionally filter by project.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'string', description: 'Optional project id to limit to one project.' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'list_inquiries',
+    description:
+      'List inquiries (leads from the public onboarding form) with contact details, what they want, budget range, and status. Call this for anything about new leads or follow-ups. Optionally filter by status (new, reviewed, archived).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', description: 'Optional status filter. One of: new, reviewed, archived.' },
+      },
+      additionalProperties: false,
+    },
+  },
 ];
 
 // ── Action tools (write powers) ──────────────────────────────────────────────
@@ -141,6 +203,22 @@ const actionDescriptions: Record<ActionName, string> = {
     'Draft a contract for a project immediately (title, notes for the terms, optional amount). Look up the project first (list_projects). Saved as a DRAFT — you never mark a contract sent or signed.',
   create_invoice:
     'Propose creating an invoice from an existing quote — it copies the quote\'s line items and total into a DRAFT invoice for the same client. Look the quote up first (list_quotes) to get its id. Optionally set a due date (YYYY-MM-DD; defaults to 14 days out). You never mark an invoice sent or paid. REQUIRES the owner\'s confirmation — the card must be confirmed before anything happens.',
+  create_deliverable:
+    'Add a deliverable to a project immediately (title, optional description/status/due date). Look up the project first (list_projects) to get its id.',
+  update_deliverable:
+    'Update an existing deliverable immediately (title, description, status — including marking it done — or due date). Look it up first (list_deliverables) to get its id.',
+  create_milestone:
+    'Add a milestone to a project immediately (title, optional date/status). Look up the project first (list_projects) to get its id.',
+  update_milestone:
+    'Update an existing milestone immediately (title, date, status). Look it up first (list_milestones) to get its id.',
+  assign_contractor:
+    'Assign a team member to a project immediately, optionally with a role and a booked rate (rate + rate_unit like "day"/"half day"/"hour"). Look up both ids first (list_contractors, list_projects).',
+  update_contract:
+    'Update an existing contract immediately (title, notes, amount, status draft/sent/signed/declined, signed date). Only set status/signed_date when the owner says that actually happened. Look the contract up via its project first.',
+  update_quote_status:
+    'Record a quote\'s real-world status immediately (draft/sent/accepted/declined). ONLY use this when the owner explicitly says it happened (e.g. "mark the Acme quote accepted — they said yes"); you cannot send quotes yourself. Look the quote up first (list_quotes).',
+  update_invoice_status:
+    'Record an invoice\'s real-world status immediately (draft/sent/paid) — bookkeeping timestamps are kept in step automatically. ONLY use this when the owner explicitly says it happened; you cannot send invoices yourself. Look the invoice up first (list_invoices).',
 };
 
 // "create_task" for auto actions; "propose_create_invoice" for gated ones.
@@ -228,6 +306,70 @@ export async function runTool(name: string, input: ToolInput, supabase: DB): Pro
         .select('id, title, status, total, subtotal, clients(name)')
         .order('created_at', { ascending: false });
       const status = asEnum(input.status, QUOTE_STATUSES);
+      if (status) q = q.eq('status', status);
+      const { data, error } = await q;
+      if (error) throw error;
+      return JSON.stringify(data ?? []);
+    }
+
+    case 'list_contractors': {
+      const { data, error } = await supabase
+        .from('contractors')
+        .select('id, name, type, role, email, phone, rate_full, rate_half, rate_hourly, project_contractors(count)')
+        .order('name');
+      if (error) throw error;
+      // Flatten the assignment count join into a plain number for the model.
+      const rows = (data ?? []).map(({ project_contractors, ...c }) => ({
+        ...c,
+        project_count: (project_contractors as unknown as { count: number }[] | null)?.[0]?.count ?? 0,
+      }));
+      return JSON.stringify(rows);
+    }
+
+    case 'list_invoices': {
+      let q = supabase
+        .from('invoices')
+        .select('id, invoice_number, title, status, total, issue_date, due_date, clients(name), projects(title)')
+        .order('created_at', { ascending: false });
+      const status = asEnum(input.status, INVOICE_STATUSES);
+      if (status) q = q.eq('status', status);
+      const { data, error } = await q;
+      if (error) throw error;
+      return JSON.stringify(data ?? []);
+    }
+
+    case 'list_deliverables': {
+      let q = supabase
+        .from('deliverables')
+        .select('id, title, status, due_date, project_id, projects(title)')
+        .order('due_date', { ascending: true, nullsFirst: false });
+      const status = asEnum(input.status, TASK_STATUSES);
+      const projectId = asString(input.project_id);
+      if (status) q = q.eq('status', status);
+      if (projectId) q = q.eq('project_id', projectId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return JSON.stringify(data ?? []);
+    }
+
+    case 'list_milestones': {
+      let q = supabase
+        .from('milestones')
+        .select('id, title, status, date, project_id, projects(title)')
+        .order('date', { ascending: true, nullsFirst: false });
+      const projectId = asString(input.project_id);
+      if (projectId) q = q.eq('project_id', projectId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return JSON.stringify(data ?? []);
+    }
+
+    case 'list_inquiries': {
+      let q = supabase
+        .from('onboarding_submissions')
+        .select('id, name, company, email, phone, project_type, project_description, budget_range, desired_timeline, status, created_at')
+        .order('created_at', { ascending: false });
+      const status = asEnum(input.status, INQUIRY_STATUSES);
       if (status) q = q.eq('status', status);
       const { data, error } = await q;
       if (error) throw error;

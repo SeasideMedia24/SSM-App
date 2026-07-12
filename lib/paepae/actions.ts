@@ -46,6 +46,9 @@ const projectStatus = z.enum([
 const taskStatus = z.enum(['not_started', 'in_progress', 'done']);
 const priority = z.enum(['low', 'medium', 'high']);
 const clientType = z.enum(['recurring', 'one_time', 'campaign']);
+const quoteStatus = z.enum(['draft', 'sent', 'accepted', 'declined']);
+const invoiceStatus = z.enum(['draft', 'sent', 'paid']);
+const contractStatus = z.enum(['draft', 'sent', 'signed', 'declined']);
 
 // ── Action schemas ───────────────────────────────────────────────────────────
 // z.strictObject rejects unknown keys, so a malformed tool call fails loudly at
@@ -150,6 +153,66 @@ export const actionSchemas = {
       )
       .min(1)
       .max(40),
+  }),
+
+  create_deliverable: z.strictObject({
+    project_id: uuid,
+    title: shortText,
+    description: longText.optional(),
+    status: taskStatus.optional(),
+    due_date: isoDate.optional(),
+  }),
+
+  update_deliverable: z.strictObject({
+    deliverable_id: uuid,
+    title: shortText.optional(),
+    description: longText.nullable().optional(),
+    status: taskStatus.optional(),
+    due_date: isoDate.nullable().optional(),
+  }),
+
+  create_milestone: z.strictObject({
+    project_id: uuid,
+    title: shortText,
+    date: isoDate.optional(),
+    status: taskStatus.optional(),
+  }),
+
+  update_milestone: z.strictObject({
+    milestone_id: uuid,
+    title: shortText.optional(),
+    date: isoDate.nullable().optional(),
+    status: taskStatus.optional(),
+  }),
+
+  // Put a team member on a project (optionally with a role and booked rate).
+  assign_contractor: z.strictObject({
+    project_id: uuid,
+    contractor_id: uuid,
+    role: shortText.optional(),
+    rate: z.number().min(0).max(100_000).optional(),
+    rate_unit: shortText.optional(),
+  }),
+
+  update_contract: z.strictObject({
+    contract_id: uuid,
+    title: shortText.optional(),
+    notes: longText.nullable().optional(),
+    amount: z.number().min(0).max(10_000_000).nullable().optional(),
+    status: contractStatus.optional(),
+    signed_date: isoDate.nullable().optional(),
+  }),
+
+  // Status RECORDING — PaePae notes what Jeremy says happened (a client
+  // accepted, an invoice got paid); it still can't send anything itself.
+  update_quote_status: z.strictObject({
+    quote_id: uuid,
+    status: quoteStatus,
+  }),
+
+  update_invoice_status: z.strictObject({
+    invoice_id: uuid,
+    status: invoiceStatus,
   }),
 } as const;
 
@@ -262,7 +325,10 @@ export async function buildProposal(
   supabase: DB,
 ): Promise<{ ok: true; proposal: Proposal } | { ok: false; error: string }> {
   const lines: string[] = [];
-  const skip = new Set(['project_id', 'client_id', 'task_id', 'quote_id', 'line_items']);
+  const skip = new Set([
+    'project_id', 'client_id', 'task_id', 'quote_id', 'line_items',
+    'deliverable_id', 'milestone_id', 'contractor_id', 'invoice_id', 'contract_id',
+  ]);
 
   // Resolve IDs to names AND verify they exist. A missing one aborts the card.
   if (typeof params.project_id === 'string') {
@@ -308,7 +374,64 @@ export async function buildProposal(
       return { ok: false, error: `No quote matches that id. Use list_quotes to get a real id, then try again.` };
     }
     lines.push(`Quote: ${data.title}`);
-    lines.push(`Amount: $${Number(data.total).toLocaleString()} (copied from the quote)`);
+    if (action === 'create_invoice') {
+      lines.push(`Amount: $${Number(data.total).toLocaleString()} (copied from the quote)`);
+    }
+  }
+  if (typeof params.deliverable_id === 'string') {
+    const { data } = await supabase
+      .from('deliverables')
+      .select('title')
+      .eq('id', params.deliverable_id)
+      .maybeSingle();
+    if (!data) {
+      return { ok: false, error: `No deliverable matches that id. Use list_deliverables to get a real id, then try again.` };
+    }
+    lines.push(`Deliverable: ${data.title}`);
+  }
+  if (typeof params.milestone_id === 'string') {
+    const { data } = await supabase
+      .from('milestones')
+      .select('title')
+      .eq('id', params.milestone_id)
+      .maybeSingle();
+    if (!data) {
+      return { ok: false, error: `No milestone matches that id. Use list_milestones to get a real id, then try again.` };
+    }
+    lines.push(`Milestone: ${data.title}`);
+  }
+  if (typeof params.contractor_id === 'string') {
+    const { data } = await supabase
+      .from('contractors')
+      .select('name')
+      .eq('id', params.contractor_id)
+      .maybeSingle();
+    if (!data) {
+      return { ok: false, error: `No team member matches that id. Use list_contractors to get a real id, then try again.` };
+    }
+    lines.push(`Team member: ${data.name}`);
+  }
+  if (typeof params.invoice_id === 'string') {
+    const { data } = await supabase
+      .from('invoices')
+      .select('title, invoice_number')
+      .eq('id', params.invoice_id)
+      .maybeSingle();
+    if (!data) {
+      return { ok: false, error: `No invoice matches that id. Use list_invoices to get a real id, then try again.` };
+    }
+    lines.push(`Invoice: ${data.invoice_number ? `${data.invoice_number} · ` : ''}${data.title}`);
+  }
+  if (typeof params.contract_id === 'string') {
+    const { data } = await supabase
+      .from('contracts')
+      .select('title')
+      .eq('id', params.contract_id)
+      .maybeSingle();
+    if (!data) {
+      return { ok: false, error: `No contract matches that id. Look it up again, then retry.` };
+    }
+    lines.push(`Contract: ${data.title}`);
   }
 
   // List the fields being set/changed.
@@ -460,6 +583,120 @@ export async function executeAction(
       }
       return `Saved draft quote “${created.title}” — $${subtotal.toLocaleString()}.`;
     }
+
+    case 'create_deliverable': {
+      const p = parsed.data as ActionParams<'create_deliverable'>;
+      // Append at the end of the project's list (the panel orders by position).
+      const { count } = await supabase
+        .from('deliverables')
+        .select('id', { count: 'exact', head: true })
+        .eq('project_id', p.project_id);
+      const { data, error } = await supabase
+        .from('deliverables')
+        .insert({ ...p, position: count ?? 0 })
+        .select('id, title')
+        .single();
+      if (error) throw friendlyError(error);
+      return `Added deliverable “${data.title}”.`;
+    }
+
+    case 'update_deliverable': {
+      const { deliverable_id, ...fields } = parsed.data as ActionParams<'update_deliverable'>;
+      const { data, error } = await supabase
+        .from('deliverables')
+        .update(fields)
+        .eq('id', deliverable_id)
+        .select('id, title')
+        .single();
+      if (error) throw friendlyError(error);
+      return `Updated deliverable “${data.title}”.`;
+    }
+
+    case 'create_milestone': {
+      const p = parsed.data as ActionParams<'create_milestone'>;
+      const { count } = await supabase
+        .from('milestones')
+        .select('id', { count: 'exact', head: true })
+        .eq('project_id', p.project_id);
+      const { data, error } = await supabase
+        .from('milestones')
+        .insert({ ...p, position: count ?? 0 })
+        .select('id, title')
+        .single();
+      if (error) throw friendlyError(error);
+      return `Added milestone “${data.title}”.`;
+    }
+
+    case 'update_milestone': {
+      const { milestone_id, ...fields } = parsed.data as ActionParams<'update_milestone'>;
+      const { data, error } = await supabase
+        .from('milestones')
+        .update(fields)
+        .eq('id', milestone_id)
+        .select('id, title')
+        .single();
+      if (error) throw friendlyError(error);
+      return `Updated milestone “${data.title}”.`;
+    }
+
+    case 'assign_contractor': {
+      const p = parsed.data as ActionParams<'assign_contractor'>;
+      const { error } = await supabase.from('project_contractors').insert(p);
+      if (error) {
+        if (error.code === '23505') throw new Error('They’re already assigned to that project.');
+        throw friendlyError(error);
+      }
+      // Names for a readable receipt (best-effort — the assignment already landed).
+      const [{ data: who }, { data: proj }] = await Promise.all([
+        supabase.from('contractors').select('name').eq('id', p.contractor_id).maybeSingle(),
+        supabase.from('projects').select('title').eq('id', p.project_id).maybeSingle(),
+      ]);
+      return `Assigned ${who?.name ?? 'the team member'} to “${proj?.title ?? 'the project'}”${p.role ? ` as ${p.role}` : ''}.`;
+    }
+
+    case 'update_contract': {
+      const { contract_id, ...fields } = parsed.data as ActionParams<'update_contract'>;
+      const { data, error } = await supabase
+        .from('contracts')
+        .update(fields)
+        .eq('id', contract_id)
+        .select('id, title, status')
+        .single();
+      if (error) throw friendlyError(error);
+      return `Updated contract “${data.title}”${fields.status ? ` — now ${data.status}` : ''}.`;
+    }
+
+    case 'update_quote_status': {
+      const p = parsed.data as ActionParams<'update_quote_status'>;
+      const { data, error } = await supabase
+        .from('quotes')
+        .update({ status: p.status })
+        .eq('id', p.quote_id)
+        .select('id, title')
+        .single();
+      if (error) throw friendlyError(error);
+      return `Marked quote “${data.title}” as ${p.status}.`;
+    }
+
+    case 'update_invoice_status': {
+      const p = parsed.data as ActionParams<'update_invoice_status'>;
+      // Keep the bookkeeping timestamps in step with the recorded status.
+      const now = new Date().toISOString();
+      const stamps =
+        p.status === 'draft'
+          ? { sent_at: null, paid_at: null }
+          : p.status === 'sent'
+            ? { sent_at: now, paid_at: null }
+            : { paid_at: now }; // paid — keep sent_at as-is
+      const { data, error } = await supabase
+        .from('invoices')
+        .update({ status: p.status, ...stamps })
+        .eq('id', p.invoice_id)
+        .select('id, title, invoice_number')
+        .single();
+      if (error) throw friendlyError(error);
+      return `Marked invoice ${data.invoice_number ? `${data.invoice_number} ` : ''}“${data.title}” as ${p.status}.`;
+    }
   }
 }
 
@@ -478,8 +715,20 @@ export function pathsToRevalidate(action: ActionName): string[] {
     case 'create_quote':
       return ['/calculator', '/dashboard'];
     case 'create_contract':
+    case 'update_contract':
       return ['/projects/contracts', '/projects'];
     case 'create_invoice':
+    case 'update_invoice_status':
       return ['/invoices', '/dashboard'];
+    case 'create_deliverable':
+    case 'update_deliverable':
+      return ['/projects/deliverables', '/projects', '/dashboard'];
+    case 'create_milestone':
+    case 'update_milestone':
+      return ['/projects', '/dashboard'];
+    case 'assign_contractor':
+      return ['/contractors', '/projects'];
+    case 'update_quote_status':
+      return ['/calculator', '/dashboard'];
   }
 }

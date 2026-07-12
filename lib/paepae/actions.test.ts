@@ -252,3 +252,46 @@ describe('autonomy policy (owner, 2026-07-11)', () => {
     expect(validateAction('update_task', { task_id: ID, project_id: null }).ok).toBe(true);
   });
 });
+
+// ── New actions (full-visibility slice, 2026-07-11) ──────────────────────────
+
+describe('expanded action schemas', () => {
+  const PID = '11111111-1111-4111-8111-111111111111';
+  const CID = '22222222-2222-4222-8222-222222222222';
+
+  it('validates create_deliverable and rejects unknown keys', () => {
+    expect(
+      validateAction('create_deliverable', { project_id: PID, title: 'Rough cut', due_date: '2026-08-01' }).ok,
+    ).toBe(true);
+    expect(
+      validateAction('create_deliverable', { project_id: PID, title: 'Rough cut', sneaky: true }).ok,
+    ).toBe(false);
+  });
+
+  it('rejects a no-op update_milestone (id only)', () => {
+    expect(validateAction('update_milestone', { milestone_id: PID }).ok).toBe(false);
+    expect(validateAction('update_milestone', { milestone_id: PID, status: 'done' }).ok).toBe(true);
+  });
+
+  it('enforces the status enums on record-status actions', () => {
+    expect(validateAction('update_quote_status', { quote_id: PID, status: 'accepted' }).ok).toBe(true);
+    expect(validateAction('update_quote_status', { quote_id: PID, status: 'paid' }).ok).toBe(false);
+    expect(validateAction('update_invoice_status', { invoice_id: PID, status: 'paid' }).ok).toBe(true);
+    expect(validateAction('update_invoice_status', { invoice_id: PID, status: 'accepted' }).ok).toBe(false);
+  });
+
+  it('validates assign_contractor and bounds the rate', () => {
+    expect(validateAction('assign_contractor', { project_id: PID, contractor_id: CID, role: 'Editor' }).ok).toBe(true);
+    expect(validateAction('assign_contractor', { project_id: PID, contractor_id: CID, rate: -5 }).ok).toBe(false);
+  });
+
+  it('keeps the confirm gate ONLY on invoicing', () => {
+    const gated = (Object.keys(actionSchemas) as ActionName[]).filter(requiresConfirmation);
+    expect(gated).toEqual(['create_invoice']);
+    // Gated tools keep the propose_ prefix; auto tools use the bare name.
+    expect(toolNameFor('create_invoice')).toBe('propose_create_invoice');
+    expect(toolNameFor('update_invoice_status')).toBe('update_invoice_status');
+    expect(actionFromToolName('propose_create_invoice')).toBe('create_invoice');
+    expect(actionFromToolName('assign_contractor')).toBe('assign_contractor');
+  });
+});

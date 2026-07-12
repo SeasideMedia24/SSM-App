@@ -59,6 +59,11 @@ const LOOKUP_LABELS: Record<string, string> = {
   list_projects: 'Checked projects',
   list_tasks: 'Checked tasks',
   list_quotes: 'Checked quotes',
+  list_contractors: 'Checked the team',
+  list_invoices: 'Checked invoices',
+  list_deliverables: 'Checked deliverables',
+  list_milestones: 'Checked milestones',
+  list_inquiries: 'Checked inquiries',
 };
 
 export async function POST(req: NextRequest) {

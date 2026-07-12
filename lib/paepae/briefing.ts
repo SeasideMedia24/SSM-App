@@ -33,6 +33,15 @@ export type BriefQuote = {
 
 export type PipelineStage = { status: ProjectStatus; label: string; count: number };
 
+export type BriefInvoice = {
+  id: string;
+  title: string;
+  invoice_number: string | null;
+  total: number;
+  due_date: string | null;
+  client: string | null;
+};
+
 export type Briefing = {
   today: string;
   horizonDays: number;
@@ -42,6 +51,8 @@ export type Briefing = {
   pipeline: PipelineStage[];
   draftQuotes: BriefQuote[]; // saved but not sent yet
   awaitingQuotes: BriefQuote[]; // sent, awaiting a client reply
+  overdueInvoices: BriefInvoice[]; // sent and past their due date
+  newInquiryCount: number; // fresh leads awaiting review
 };
 
 // ── Pure helpers (unit tested) ───────────────────────────────────────────────
@@ -108,7 +119,7 @@ function relName(rel: unknown, key: string): string | null {
 export async function getBriefing(supabase: DB, today: string): Promise<Briefing> {
   const horizon = addDays(today, HORIZON_DAYS);
 
-  const [{ data: tasks }, { data: projects }, { data: quotes }] = await Promise.all([
+  const [{ data: tasks }, { data: projects }, { data: quotes }, { data: invoices }, { count: inquiryCount }] = await Promise.all([
     // Only pull tasks we'll actually bucket: not done, dated, and due on or
     // before the horizon (overdue tasks are <= horizon too).
     supabase
@@ -124,6 +135,18 @@ export async function getBriefing(supabase: DB, today: string): Promise<Briefing
       .select('id, title, total, status, clients(name)')
       .in('status', ['draft', 'sent'])
       .order('created_at', { ascending: false }),
+    // Sent invoices already past their due date — money to chase.
+    supabase
+      .from('invoices')
+      .select('id, title, invoice_number, total, due_date, clients(name)')
+      .eq('status', 'sent')
+      .lt('due_date', today)
+      .order('due_date'),
+    // Fresh leads nobody has looked at yet.
+    supabase
+      .from('onboarding_submissions')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'new'),
   ]);
 
   const briefTasks: BriefTask[] = (tasks ?? []).map((t) => ({
@@ -145,6 +168,15 @@ export async function getBriefing(supabase: DB, today: string): Promise<Briefing
 
   const activeProjects = projects ?? [];
 
+  const overdueInvoices: BriefInvoice[] = (invoices ?? []).map((inv) => ({
+    id: inv.id,
+    title: inv.title,
+    invoice_number: inv.invoice_number,
+    total: inv.total,
+    due_date: inv.due_date,
+    client: relName(inv.clients, 'name'),
+  }));
+
   return {
     today,
     horizonDays: HORIZON_DAYS,
@@ -154,5 +186,7 @@ export async function getBriefing(supabase: DB, today: string): Promise<Briefing
     pipeline: pipelineByStage(activeProjects),
     draftQuotes: draft.map(toBriefQuote),
     awaitingQuotes: awaiting.map(toBriefQuote),
+    overdueInvoices,
+    newInquiryCount: inquiryCount ?? 0,
   };
 }

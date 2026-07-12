@@ -19,7 +19,7 @@ draft contracts. (Details under "Recently shipped".)
 
 1. ✅ **Calculator: whole-calculator Reset button** — in the Totals card (new-quote mode), two-step confirm, clears the saved draft too.
 2. ✅ **Calculator: saved quotes rework** — top dropdown removed; the list shows the 5 newest with a Notion-style "Past quotes" toggle for the rest.
-3. **PaePae integrations (Phase 3 — plan first)**: email sending, QuickBooks invoicing, Google Calendar meeting BOOKING (read-only viewing shipped — see item 6; booking needs a write scope + confirm gate). Needs OAuth/provider decisions with the owner before code.
+3. **PaePae integrations (Phase 3 — blocked on the owner's accounts)**: email sending, QuickBooks invoicing, Google Calendar meeting BOOKING (read-only viewing shipped — see item 6; booking needs a write scope + confirm gate). Owner to-dos, in order: (a) Google Cloud OAuth credentials → unlocks calendar view NOW and later booking + Gmail sending on the same connection; (b) run migration 20260711000001; (c) QuickBooks developer account when we get there. All the credential-free groundwork is done (see "PaePae full visibility" under Recently shipped).
 4. ✅ **PaePae autonomy** — task/project/client/quote/contract create+update now execute immediately with receipt cards (logged to the dashboard action log). Confirmation reserved for invoicing today + email/calendar/onboarding-link sends when they arrive (`CONFIRM_ACTIONS` in lib/paepae/actions.ts).
 5. ✅ **PaePae tasks without a project** — create_task takes optional project/client; update_task can attach/detach later.
 6. ✅ **Dashboard calendar** — shipped 2026-07-11 in two passes: (a) month grid of tasks/projects/milestones/deliverables; (b) full rebuild — Apple-style month view, Week + Day views with an all-day strip and 12 AM–11:59 PM time grid, source tabs (Seaside Media / Personal / Everything), and read-only Google Calendar sync (OAuth connect in Settings, per-calendar include toggles, migration 20260711000001). Owner still to do: Google Cloud credentials + run the migration. Event BOOKING stays in item 3.
@@ -54,6 +54,8 @@ draft contracts. (Details under "Recently shipped".)
 ---
 
 ## ✅ Recently shipped
+
+- PaePae full visibility + expanded hands (2026-07-11): new read tools (team/contractors, invoices, deliverables, milestones, inquiries); briefing now includes overdue invoices + new-inquiry count; new AUTO actions — create/update deliverables & milestones, assign a team member to a project, update contracts, and RECORD quote/invoice statuses (only when the owner says the event happened; timestamps kept in step). Confirm gate still on invoicing only.
 
 - Contractors: full/half/hourly rates + self-onboarding link (no login). (Migration 20260709000003.)
 - Contractors/Team (Slice A): directory (internal/external/employees), rates, and project assignments. (Migration 20260709000002.)

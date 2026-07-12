@@ -49,6 +49,14 @@ const ACTION_TITLES: Record<string, string> = {
   create_quote: 'Save draft quote',
   create_contract: 'Draft contract',
   create_invoice: 'Create invoice',
+  create_deliverable: 'Add deliverable',
+  update_deliverable: 'Update deliverable',
+  create_milestone: 'Add milestone',
+  update_milestone: 'Update milestone',
+  assign_contractor: 'Assign team member',
+  update_contract: 'Update contract',
+  update_quote_status: 'Record quote status',
+  update_invoice_status: 'Record invoice status',
 };
 
 // Starter prompts for the empty state — tuned to what PaePae can actually do.
