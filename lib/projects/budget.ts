@@ -11,7 +11,7 @@
 // A project can have many quotes; they are all kept and all counted. The maths
 // lives here so the per-project view and the all-projects Budgets page agree.
 
-import { computeCost, type CalculatorSelections, type PricingConfig } from '@/lib/pricing/engine';
+import { computeCost, computeCostLines, type CalculatorSelections, type PricingConfig } from '@/lib/pricing/engine';
 import type { QuoteStatus } from '@/types/database.types';
 
 // The pricing rate tables, passed straight through to computeCost. Typed off
@@ -32,6 +32,9 @@ export type BudgetQuote = {
   created_at: string;
 };
 
+// One line of the cost breakdown, ready to render (label + cost amount).
+export type BudgetCostLine = { label: string; amount: number };
+
 export type QuoteBudgetRow = {
   id: string;
   title: string;
@@ -40,19 +43,25 @@ export type QuoteBudgetRow = {
   charge: number;
   cost: number | null; // null when the quote has no saved selections to cost
   margin: number | null;
+  costLines: BudgetCostLine[]; // itemised cost (no markup/discount); empty if no basis
 };
 
 export function quoteBudgetRow(quote: BudgetQuote, ctx: PricingContext): QuoteBudgetRow {
   const charge = quote.total ?? 0;
   let cost: number | null = null;
   let margin: number | null = null;
+  let costLines: BudgetCostLine[] = [];
 
   const state = quote.calculator_state as CalculatorSelections | null;
   if (state) {
     cost = computeCost(state, ctx.roles, ctx.services, ctx.config).total;
     margin = charge - cost;
+    costLines = computeCostLines(state, ctx.roles, ctx.services, ctx.config).lines.map((l) => ({
+      label: l.label,
+      amount: l.amount,
+    }));
   }
-  return { id: quote.id, title: quote.title, status: quote.status, createdAt: quote.created_at, charge, cost, margin };
+  return { id: quote.id, title: quote.title, status: quote.status, createdAt: quote.created_at, charge, cost, margin, costLines };
 }
 
 // Roll several quote rows up into a project (or all-projects) total. Cost/margin

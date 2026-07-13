@@ -72,6 +72,28 @@ export function QuoteBudget({ rows }: { rows: QuoteBudgetRow[] }) {
         />
       </div>
 
+      {/* Itemised cost basis — what it costs to deliver, no markup or discount. */}
+      {cur.costLines.length > 0 && (
+        <div className="overflow-hidden rounded-xl border border-slate-200">
+          <div className="flex items-center justify-between bg-slate-50 px-3 py-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Cost breakdown</span>
+            <span className="text-[11px] text-slate-400">what it costs to deliver — no markup</span>
+          </div>
+          <ul className="divide-y divide-slate-100">
+            {cur.costLines.map((line, i) => (
+              <li key={i} className="flex items-center justify-between px-3 py-2 text-sm">
+                <span className="text-slate-700">{line.label}</span>
+                <span className="text-slate-600">{money(line.amount)}</span>
+              </li>
+            ))}
+            <li className="flex items-center justify-between bg-slate-50 px-3 py-2 text-sm font-semibold text-ink">
+              <span>Total cost</span>
+              <span>{cur.cost != null ? money(cur.cost) : '—'}</span>
+            </li>
+          </ul>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${meta.pill}`}>{meta.label}</span>
         <Link href={`/calculator?quote=${cur.id}`} className="font-medium text-sea hover:underline">

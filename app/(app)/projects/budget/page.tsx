@@ -1,14 +1,14 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
-import { GlobalTable, GlobalEmpty } from '@/components/projects/global-table';
-import { money } from '@/lib/projects/format';
+import { GlobalEmpty } from '@/components/projects/global-table';
+import { QuoteBudget } from '@/components/projects/quote-budget';
 import type { PricingConfig } from '@/lib/pricing/engine';
-import { quoteBudgetRow, sumBudget, type PricingContext, type QuoteBudgetRow } from '@/lib/projects/budget';
+import { quoteBudgetRow, type PricingContext, type QuoteBudgetRow } from '@/lib/projects/budget';
 
-// All-projects budget: each project's budget is the sum of ALL quotes linked to
-// it — cost basis, client charge, and margin (charge − cost). Every quote counts;
-// a project with several quotes shows their combined total.
+// All-projects budget: one card per project, each showing that project's quotes
+// with the same view as the project's own Budget tab — the quote dropdown, the
+// cost/charge/margin cards, and the itemised cost breakdown.
 export default async function AllBudgetsPage() {
   const supabase = await createClient();
 
@@ -31,7 +31,7 @@ export default async function AllBudgetsPage() {
     config: Object.fromEntries((configRows ?? []).map((c) => [c.key, c.value])) as PricingConfig,
   };
 
-  // Group quote budget rows by project.
+  // Group quote budget rows by project (quotes come newest-first).
   const byProject = new Map<string, QuoteBudgetRow[]>();
   for (const q of quotes ?? []) {
     if (!q.project_id) continue;
@@ -40,45 +40,35 @@ export default async function AllBudgetsPage() {
     byProject.set(q.project_id, list);
   }
 
-  type Row = { id: string; title: string; count: number; cost: number | null; charge: number; margin: number | null };
-  const rows: Row[] = [];
-  for (const p of projects ?? []) {
-    const quoteRows = byProject.get(p.id);
-    if (!quoteRows || quoteRows.length === 0) continue; // no quotes → nothing to budget
-    const totals = sumBudget(quoteRows);
-    rows.push({ id: p.id, title: p.title, count: quoteRows.length, ...totals });
-  }
-  rows.sort((a, b) => b.charge - a.charge);
+  const cards = (projects ?? [])
+    .map((p) => ({ project: p, rows: byProject.get(p.id) ?? [] }))
+    .filter((c) => c.rows.length > 0)
+    .sort((a, b) => (b.rows[0]?.charge ?? 0) - (a.rows[0]?.charge ?? 0));
 
   return (
     <>
       <PageHeader
         title="Budgets"
-        description="Each project’s budget from its linked quotes — cost basis, client charge, and margin."
+        description="Each project’s budget from its linked quotes — with the itemised cost of delivering it."
       />
-      {rows.length === 0 ? (
+      {cards.length === 0 ? (
         <GlobalEmpty>
           No budgets yet. Link a quote to a project in the{' '}
           <Link href="/calculator" className="text-sea underline">Price Calculator</Link>.
         </GlobalEmpty>
       ) : (
-        <GlobalTable headers={['Project', 'Quotes', 'Cost', 'Charge', 'Margin']}>
-          {rows.map((r) => (
-            <tr key={r.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-              <td className="px-4 py-3">
-                <Link href={`/projects/${r.id}?view=budget`} className="font-medium text-ink hover:text-sea hover:underline">
-                  {r.title}
+        <div className="space-y-5">
+          {cards.map(({ project, rows }) => (
+            <section key={project.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex items-center justify-between">
+                <Link href={`/projects/${project.id}?view=budget`} className="text-base font-semibold text-ink hover:text-sea hover:underline">
+                  {project.title}
                 </Link>
-              </td>
-              <td className="px-4 py-3 text-slate-500">{r.count}</td>
-              <td className="px-4 py-3 text-slate-600">{r.cost != null ? money(r.cost) : '—'}</td>
-              <td className="px-4 py-3 text-slate-600">{money(r.charge)}</td>
-              <td className={`px-4 py-3 font-medium ${r.margin == null ? 'text-slate-400' : r.margin < 0 ? 'text-red-600' : 'text-green-700'}`}>
-                {r.margin != null ? money(r.margin) : '—'}
-              </td>
-            </tr>
+              </div>
+              <QuoteBudget rows={rows} />
+            </section>
           ))}
-        </GlobalTable>
+        </div>
       )}
     </>
   );

@@ -196,6 +196,55 @@ export type CostBreakdown = {
   total: number;
 };
 
+// A per-LINE cost breakdown — the same individual lines as computeQuote, but at
+// COST (no markup, no discount). This is "what it actually costs to deliver,"
+// itemised, for the project budget view.
+export function computeCostLines(
+  s: CalculatorSelections,
+  roles: RoleRates[],
+  services: PageService[],
+  config: PricingConfig,
+): { lines: QuoteLine[]; total: number } {
+  const lines: QuoteLine[] = [];
+
+  for (const role of roles) {
+    const sel = s.roles[role.id];
+    if (!sel) continue;
+    const cost = r2(roleCost(role, sel, s));
+    if (cost <= 0) continue;
+    lines.push({ label: roleLineLabel(role, sel, s), quantity: 1, unit: null, rate: cost, amount: cost });
+  }
+
+  if (s.rental !== 'none') {
+    const rental = r2(config[`rental_${s.rental}`] ?? 0);
+    if (rental > 0) lines.push({ label: `Equipment rental — ${RENTAL_LABELS[s.rental]}`, quantity: 1, unit: null, rate: rental, amount: rental });
+  }
+
+  const selected = new Set(s.serviceIds);
+  for (const svc of services) {
+    if (!selected.has(svc.id)) continue;
+    const cost = r2(s.pageMinutes * svc.page_rate);
+    if (cost <= 0) continue;
+    lines.push({ label: `${svc.name} — ${s.pageMinutes} page/min`, quantity: s.pageMinutes, unit: 'page/min', rate: r2(svc.page_rate), amount: cost });
+  }
+
+  if (s.aboutUs) {
+    const cost = r2(config['about_us_fee'] ?? 0);
+    if (cost > 0) lines.push({ label: '“About Us” video', quantity: 1, unit: null, rate: cost, amount: cost });
+  }
+  if (s.shorts > 0) {
+    const rate = r2(config['short_rate'] ?? 0);
+    const cost = r2(s.shorts * rate);
+    if (cost > 0) lines.push({ label: `Shorts ×${s.shorts}`, quantity: s.shorts, unit: 'short', rate, amount: cost });
+  }
+
+  const travel = r2(Math.max(0, s.travel));
+  if (travel > 0) lines.push({ label: 'Travel / Food', quantity: 1, unit: null, rate: travel, amount: travel });
+
+  const total = r2(lines.reduce((sum, l) => sum + l.amount, 0));
+  return { lines, total };
+}
+
 export function computeCost(
   s: CalculatorSelections,
   roles: RoleRates[],
