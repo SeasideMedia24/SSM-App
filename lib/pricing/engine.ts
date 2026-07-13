@@ -34,7 +34,17 @@ export type RentalTier = 'none' | 'low' | 'medium_low' | 'medium' | 'high';
 export type PhotographerBooking = 'day' | 'half' | 'hourly';
 export type DiscountKey = 'referral' | 'first_time' | 'military';
 
+// Actor/model tiers, priciest first.
+export type ActorTier = 'high' | 'medium' | 'low';
+export const ACTOR_TIERS: { key: ActorTier; label: string }[] = [
+  { key: 'high', label: 'A-tier' },
+  { key: 'medium', label: 'B-tier' },
+  { key: 'low', label: 'C-tier' },
+];
+
 // Everything the owner picks in the calculator. Saved to quotes.calculator_state.
+// (Fields added over time are read defensively with `?? 0` so quotes saved
+// before a field existed still price correctly.)
 export type CalculatorSelections = {
   pageMinutes: number;
   fullDays: number;
@@ -49,6 +59,9 @@ export type CalculatorSelections = {
   roles: Record<string, { quantity: number; booking?: PhotographerBooking }>;
   serviceIds: string[]; // selected pre/post page-service ids
   discounts: DiscountKey[];
+  // Actors/models: count per tier. Permits: how many permits.
+  actors: Record<ActorTier, number>;
+  permits: number;
 };
 
 export type QuoteLine = { label: string; quantity: number; unit: string | null; rate: number; amount: number };
@@ -70,8 +83,17 @@ export function emptySelections(): CalculatorSelections {
   return {
     pageMinutes: 0, fullDays: 0, halfDays: 0, hours: 0, droneHours: 0, shorts: 0,
     travel: 0, rental: 'none', aboutUs: false, roles: {}, serviceIds: [], discounts: [],
+    actors: { high: 0, medium: 0, low: 0 }, permits: 0,
   };
 }
+
+// Actor/permit rate lookups — tolerant of missing keys (default 0) and of quotes
+// saved before these fields existed (actors/permits may be undefined).
+const actorRate = (config: PricingConfig, tier: ActorTier) => config[`actor_${tier}`] ?? 0;
+const actorCount = (s: CalculatorSelections, tier: ActorTier) => Math.max(0, s.actors?.[tier] ?? 0);
+const permitCount = (s: CalculatorSelections) => Math.max(0, s.permits ?? 0);
+const actorLabel = (tier: ActorTier, count: number) =>
+  `${ACTOR_TIERS.find((t) => t.key === tier)?.label ?? tier} actor${count === 1 ? '' : 's'} ×${count}`;
 
 // Cost of one crew role BEFORE markup (the sheet's C10..C13 pieces).
 function roleCost(role: RoleRates, sel: { quantity: number; booking?: PhotographerBooking }, s: CalculatorSelections): number {
@@ -130,6 +152,17 @@ export function computeQuote(
     lines.push({ label: roleLineLabel(role, sel, s), quantity: 1, unit: null, rate: amount, amount });
   }
 
+  // Actors / models — billed like crew (marked up).
+  for (const { key: tier } of ACTOR_TIERS) {
+    const count = actorCount(s, tier);
+    if (count <= 0) continue;
+    const cost = count * actorRate(config, tier);
+    if (cost <= 0) continue;
+    const amount = r2(cost * markup);
+    crewTotal += amount;
+    lines.push({ label: actorLabel(tier, count), quantity: count, unit: 'actor', rate: r2(actorRate(config, tier) * markup), amount });
+  }
+
   // Rental gear — added at list price, no markup (matches the sheet).
   let rentalAmount = 0;
   if (s.rental !== 'none') {
@@ -169,11 +202,15 @@ export function computeQuote(
   pre = r2(pre);
   post = r2(post);
 
-  // ---- Travel/Food — direct pass-through ----
+  // ---- Travel/Food + Permits — direct pass-through (no markup) ----
   const travel = r2(Math.max(0, s.travel));
   if (travel > 0) lines.push({ label: 'Travel / Food', quantity: 1, unit: null, rate: travel, amount: travel });
 
-  const overall = r2(production + pre + post + travel);
+  const permitCnt = permitCount(s);
+  const permits = r2(permitCnt * (config['permit'] ?? 0));
+  if (permits > 0) lines.push({ label: `Permits ×${permitCnt}`, quantity: permitCnt, unit: 'permit', rate: r2(config['permit'] ?? 0), amount: permits });
+
+  const overall = r2(production + pre + post + travel + permits);
 
   // ---- Discounts stack additively (sheet C20) ----
   let discountPct = 0;
@@ -215,6 +252,14 @@ export function computeCostLines(
     lines.push({ label: roleLineLabel(role, sel, s), quantity: 1, unit: null, rate: cost, amount: cost });
   }
 
+  // Actors / models — at cost (no markup).
+  for (const { key: tier } of ACTOR_TIERS) {
+    const count = actorCount(s, tier);
+    const cost = r2(count * actorRate(config, tier));
+    if (cost <= 0) continue;
+    lines.push({ label: actorLabel(tier, count), quantity: count, unit: 'actor', rate: r2(actorRate(config, tier)), amount: cost });
+  }
+
   if (s.rental !== 'none') {
     const rental = r2(config[`rental_${s.rental}`] ?? 0);
     if (rental > 0) lines.push({ label: `Equipment rental — ${RENTAL_LABELS[s.rental]}`, quantity: 1, unit: null, rate: rental, amount: rental });
@@ -241,6 +286,10 @@ export function computeCostLines(
   const travel = r2(Math.max(0, s.travel));
   if (travel > 0) lines.push({ label: 'Travel / Food', quantity: 1, unit: null, rate: travel, amount: travel });
 
+  const permitCnt = permitCount(s);
+  const permits = r2(permitCnt * (config['permit'] ?? 0));
+  if (permits > 0) lines.push({ label: `Permits ×${permitCnt}`, quantity: permitCnt, unit: 'permit', rate: r2(config['permit'] ?? 0), amount: permits });
+
   const total = r2(lines.reduce((sum, l) => sum + l.amount, 0));
   return { lines, total };
 }
@@ -258,6 +307,9 @@ export function computeCost(
     const cost = roleCost(role, sel, s);
     if (cost > 0) crew += cost;
   }
+  // Actors count toward crew cost; permits toward travel/pass-through cost.
+  for (const { key: tier } of ACTOR_TIERS) crew += actorCount(s, tier) * actorRate(config, tier);
+  const permitsCost = permitCount(s) * (config['permit'] ?? 0);
 
   const rental = s.rental !== 'none' ? r2(config[`rental_${s.rental}`] ?? 0) : 0;
 
@@ -274,7 +326,7 @@ export function computeCost(
   if (s.aboutUs) post += config['about_us_fee'] ?? 0;
   if (s.shorts > 0) post += s.shorts * (config['short_rate'] ?? 0);
 
-  const travel = r2(Math.max(0, s.travel));
+  const travel = r2(Math.max(0, s.travel) + permitsCost);
   const crewR = r2(crew);
   const preR = r2(pre);
   const postR = r2(post);

@@ -15,6 +15,19 @@ draft contracts. (Details under "Recently shipped".)
 
 ---
 
+## ✅ Pre-deploy cleanup (owner, 2026-07-13) — SHIPPED
+
+All 10 done: (1) contractor "page not found" was the localhost/not-deployed
+gap — resolves on deploy; (2/3) calendar sources are now per-calendar filter
+chips (Seaside Media + each Google calendar), everything shown by default;
+(4) event times render in the viewer's timezone; (5) floating PaePae dock on
+every tab; (6) activity rows show the specific action; (7) itemised cost
+breakdown per quote in both budget views; (8) deliverables filter chips
+removed; (9) actors/models (3 tiers) + permits in the calculator and Edit
+rates (migration 20260712000002 — set the rates in Settings); (10) duplicate
+Google-event key crash fixed. **Owner: run migration 20260712000002, then
+deploy.**
+
 ## 🔨 Current batch (owner, 2026-07-11)
 
 1. ✅ **Calculator: whole-calculator Reset button** — in the Totals card (new-quote mode), two-step confirm, clears the saved draft too.

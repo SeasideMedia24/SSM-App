@@ -95,6 +95,7 @@ const CONFIG_KEYS = new Set([
   'markup', 'about_us_fee', 'short_rate',
   'rental_low', 'rental_medium_low', 'rental_medium', 'rental_high',
   'discount_referral', 'discount_first_time', 'discount_military',
+  'actor_high', 'actor_medium', 'actor_low', 'permit',
 ]);
 
 export async function savePricingConfig(_prev: PricingFormState, formData: FormData): Promise<PricingFormState> {

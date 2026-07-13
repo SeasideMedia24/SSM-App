@@ -25,6 +25,12 @@ export const selectionsSchema = z.object({
   ),
   serviceIds: z.array(z.string().uuid()).max(100),
   discounts: z.array(z.enum(['referral', 'first_time', 'military'])).max(3),
+  // Actors/models per tier + permit count. Defaulted so quotes saved before
+  // these fields existed still validate.
+  actors: z
+    .object({ high: count, medium: count, low: count })
+    .default({ high: 0, medium: 0, low: 0 }),
+  permits: count.default(0),
 });
 
 export const calculatorQuoteSchema = z.object({

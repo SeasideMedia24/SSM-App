@@ -11,9 +11,9 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { saveQuote, quickCreateClient, type QuoteFormState } from '@/app/(app)/calculator/actions';
 import {
-  computeQuote, emptySelections, RENTAL_LABELS, DISCOUNT_LABELS,
+  computeQuote, emptySelections, RENTAL_LABELS, DISCOUNT_LABELS, ACTOR_TIERS,
   type CalculatorSelections, type RoleRates, type PageService, type PricingConfig,
-  type RentalTier, type DiscountKey, type PhotographerBooking,
+  type RentalTier, type DiscountKey, type PhotographerBooking, type ActorTier,
 } from '@/lib/pricing/engine';
 import { money } from '@/lib/projects/format';
 
@@ -129,6 +129,19 @@ export function ProductionCalculator({
   }
   function setRole(id: string, patch: { quantity?: number; booking?: PhotographerBooking }) {
     setS((prev) => ({ ...prev, roles: { ...prev.roles, [id]: { ...prev.roles[id], ...patch } } }));
+  }
+  // Actor count per tier — rebuilt whole each time so quotes saved before the
+  // actors field existed (prev.actors undefined) get a complete object.
+  function setActor(tier: ActorTier, value: number) {
+    setS((prev) => ({
+      ...prev,
+      actors: {
+        high: prev.actors?.high ?? 0,
+        medium: prev.actors?.medium ?? 0,
+        low: prev.actors?.low ?? 0,
+        [tier]: value,
+      },
+    }));
   }
   function toggleService(id: string) {
     setS((prev) => ({
@@ -262,6 +275,31 @@ export function ProductionCalculator({
                 {t.label}{t.value !== 'none' && <span className="ml-1.5 text-xs text-slate-400">{money(t.price)}</span>}
               </button>
             ))}
+          </div>
+        </Card>
+
+        {/* Actors / Models + Permits */}
+        <Card
+          title="Actors / Models & Permits"
+          hint="Actors are billed like crew (marked up); permits pass through at cost. Set rates in Settings → Edit rates."
+          onReset={() => set({ actors: { high: 0, medium: 0, low: 0 }, permits: 0 })}
+        >
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {ACTOR_TIERS.map(({ key, label }) => (
+              <Amount
+                key={key}
+                label={`${label} actors`}
+                value={s.actors?.[key] ?? 0}
+                onChange={(v) => setActor(key, v)}
+                hint={`${money(config[`actor_${key}`] ?? 0)}/day`}
+              />
+            ))}
+            <Amount
+              label="Permits"
+              value={s.permits ?? 0}
+              onChange={(v) => set({ permits: v })}
+              hint={`${money(config['permit'] ?? 0)} each`}
+            />
           </div>
         </Card>
 
