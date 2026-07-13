@@ -26,7 +26,8 @@ export type CalendarItem = {
   id: string;
   title: string;
   kind: CalendarItemKind;
-  sourceKey: string; // 'ssm' for app items; the Google calendar id for gcal items
+  sourceKey: string; // the source bucket name ("Seaside Media", "Home", …)
+  color?: string; // Google calendar color, so each calendar's events look distinct
   href: string;
   external?: boolean; // gcal items open Google Calendar in a new tab
   done?: boolean;
@@ -308,14 +309,15 @@ function TimeGridView({
                 const top = ((item.startMin ?? 0) / 60) * HOUR_PX;
                 const height = Math.max((((item.endMin ?? 0) - (item.startMin ?? 0)) / 60) * HOUR_PX, 18);
                 const style = KIND_STYLE[item.kind];
+                const tinted = item.kind === 'gcal' && item.color;
                 return (
                   <a
                     key={`${iso}-t-${i}`}
                     href={item.href}
                     {...(item.external ? { target: '_blank', rel: 'noreferrer' } : {})}
                     title={`${item.timeLabel ?? ''} ${item.title}`.trim()}
-                    className={`absolute inset-x-0.5 overflow-hidden rounded border-l-2 px-1 py-0.5 text-[11px] leading-tight transition-opacity hover:opacity-75 ${style.block}`}
-                    style={{ top, height }}
+                    className={`absolute inset-x-0.5 overflow-hidden rounded border-l-2 px-1 py-0.5 text-[11px] leading-tight transition-opacity hover:opacity-75 ${tinted ? 'text-slate-700' : style.block}`}
+                    style={tinted ? { top, height, backgroundColor: `${item.color}22`, borderLeftColor: item.color! } : { top, height }}
                   >
                     <span className="font-medium">{item.title}</span>
                     {item.timeLabel && <span className="ml-1 opacity-70">{item.timeLabel}</span>}
@@ -337,18 +339,22 @@ function TimeGridView({
 function Pill({ item }: { item: CalendarItem }) {
   const style = KIND_STYLE[item.kind];
   const label = item.timeLabel ? `${item.timeLabel} ${item.title}` : item.title;
-  const cls = `block truncate rounded px-1.5 py-0.5 text-[11px] leading-4 transition-opacity hover:opacity-75 ${style.pill} ${
-    item.done ? 'line-through opacity-50' : ''
-  }`;
+  // Google events are tinted with their own calendar's color so calendars are
+  // visually distinct; app items keep their kind color.
+  const tinted = item.kind === 'gcal' && item.color;
+  const cls = `block truncate rounded px-1.5 py-0.5 text-[11px] leading-4 transition-opacity hover:opacity-75 ${
+    tinted ? 'text-slate-700' : style.pill
+  } ${item.done ? 'line-through opacity-50' : ''}`;
+  const inline = tinted ? { backgroundColor: `${item.color}22`, borderLeft: `3px solid ${item.color}` } : undefined;
   if (item.external) {
     return (
-      <a href={item.href} target="_blank" rel="noreferrer" title={`${style.label}: ${item.title}`} className={cls}>
+      <a href={item.href} target="_blank" rel="noreferrer" title={`${style.label}: ${item.title}`} className={cls} style={inline}>
         {label}
       </a>
     );
   }
   return (
-    <Link href={item.href} title={`${style.label}: ${item.title}`} className={cls}>
+    <Link href={item.href} title={`${style.label}: ${item.title}`} className={cls} style={inline}>
       {label}
     </Link>
   );

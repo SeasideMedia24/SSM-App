@@ -278,24 +278,50 @@ export function ProductionCalculator({
           </div>
         </Card>
 
-        {/* Actors / Models + Permits */}
+        {/* Actors / Models — checkbox per tier (with a count when checked) */}
         <Card
-          title="Actors / Models & Permits"
-          hint="Actors are billed like crew (marked up); permits pass through at cost. Set rates in Settings → Edit rates."
-          onReset={() => set({ actors: { high: 0, medium: 0, low: 0 }, permits: 0 })}
+          title="Actors / Models"
+          hint="Billed like crew (marked up). Set the tier rates in Settings → Edit rates."
+          onReset={() => set({ actors: { high: 0, medium: 0, low: 0 } })}
         >
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            {ACTOR_TIERS.map(({ key, label }) => (
-              <Amount
-                key={key}
-                label={`${label} actors`}
-                value={s.actors?.[key] ?? 0}
-                onChange={(v) => setActor(key, v)}
-                hint={`${money(config[`actor_${key}`] ?? 0)}/day`}
-              />
-            ))}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {ACTOR_TIERS.map(({ key, label }) => {
+              const count = s.actors?.[key] ?? 0;
+              const checked = count > 0;
+              return (
+                <div
+                  key={key}
+                  className={`flex items-center gap-3 rounded-xl border px-3 py-2 transition-colors ${checked ? 'border-teal/50 bg-teal/5' : 'border-slate-200'}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => setActor(key, checked ? 0 : 1)}
+                    className="h-4 w-4 accent-teal"
+                    aria-label={`${label} actor`}
+                  />
+                  <span className="text-sm text-slate-800">{label}</span>
+                  <span className="text-xs text-slate-400">{money(config[`actor_${key}`] ?? 0)}/day</span>
+                  {checked && (
+                    <span className="ml-auto">
+                      <Stepper value={count} onChange={(v) => setActor(key, v)} label={`${label} actors`} />
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+
+        {/* Permits — its own section, passed through at cost */}
+        <Card
+          title="Permits"
+          hint="Passed through at cost — not marked up. Set the per-permit fee in Settings → Edit rates."
+          onReset={() => set({ permits: 0 })}
+        >
+          <div className="w-44">
             <Amount
-              label="Permits"
+              label="How many permits"
               value={s.permits ?? 0}
               onChange={(v) => set({ permits: v })}
               hint={`${money(config['permit'] ?? 0)} each`}

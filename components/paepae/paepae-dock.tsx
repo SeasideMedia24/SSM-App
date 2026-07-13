@@ -7,17 +7,24 @@
 // Hidden on the dedicated /paepae page (that page already IS the full chat) to
 // avoid two chat panels at once.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { usePathname } from 'next/navigation';
 import { PaePaeChat } from '@/components/paepae/chat';
 
 export function PaepaeDock() {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
-  if (pathname === '/paepae') return null;
 
-  return (
-    <div className="fixed bottom-4 left-4 z-50 flex flex-col items-start">
+  // Portal to <body> so the fixed position is anchored to the viewport — never
+  // trapped inside a transformed/scrolling ancestor (which was pinning it to the
+  // top). Effect-gated so it only renders after mount (portals need the DOM).
+  useEffect(() => setMounted(true), []);
+  if (pathname === '/paepae' || !mounted) return null;
+
+  return createPortal(
+    <div className="fixed bottom-5 left-5 z-[60] flex flex-col items-start">
       {open && (
         // The chat fills this panel: [&>div]:!h-full overrides PaePaeChat's own
         // full-viewport height so it sits neatly inside the dock.
@@ -44,6 +51,7 @@ export function PaepaeDock() {
           </svg>
         )}
       </button>
-    </div>
+    </div>,
+    document.body,
   );
 }

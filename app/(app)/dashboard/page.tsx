@@ -111,33 +111,38 @@ export default async function DashboardPage({
     (itemsByDay[iso] ??= []).push(item);
   };
 
+  // Calendar sources are bucketed by NAME, so the app's own "Seaside Media"
+  // schedule and a Google calendar also named "Seaside Media" collapse into a
+  // single chip. The app schedule lives under the "Seaside Media" bucket.
+  const SSM = 'Seaside Media';
   for (const m of calMilestones ?? []) {
-    addCal(m.date, { id: m.id, title: m.title, kind: 'milestone', sourceKey: 'ssm', href: `/projects/${m.project_id}`, done: m.status === 'done' });
+    addCal(m.date, { id: m.id, title: m.title, kind: 'milestone', sourceKey: SSM, href: `/projects/${m.project_id}`, done: m.status === 'done' });
   }
   for (const p of calProjects ?? []) {
-    addCal(p.due_date, { id: p.id, title: p.title, kind: 'project', sourceKey: 'ssm', href: `/projects/${p.id}` });
+    addCal(p.due_date, { id: p.id, title: p.title, kind: 'project', sourceKey: SSM, href: `/projects/${p.id}` });
   }
   for (const d of calDeliverables ?? []) {
-    addCal(d.due_date, { id: d.id, title: d.title, kind: 'deliverable', sourceKey: 'ssm', href: `/projects/${d.project_id}?view=deliverables`, done: d.status === 'done' });
+    addCal(d.due_date, { id: d.id, title: d.title, kind: 'deliverable', sourceKey: SSM, href: `/projects/${d.project_id}?view=deliverables`, done: d.status === 'done' });
   }
   for (const t of calTasks ?? []) {
     addCal(t.due_date, {
       id: t.id,
       title: t.title,
       kind: 'task',
-      sourceKey: 'ssm',
+      sourceKey: SSM,
       href: t.project_id ? `/projects/${t.project_id}?view=tasks` : '/my-tasks',
       done: t.status === 'done',
     });
   }
 
-  // Google events, deduped by (day + id) so an event shared across two included
-  // calendars shows once rather than colliding.
+  // Google events bucket by calendar NAME too, and carry their calendar's color
+  // so each calendar's events are visually distinct. Deduped by (day + id).
   const googleSources = new Map<string, CalendarSource>();
   if (googleSync.status === 'ok') {
     const seen = new Set<string>();
     for (const ev of googleSync.events) {
-      googleSources.set(ev.calendarId, { key: ev.calendarId, label: ev.calendar || 'Calendar', color: ev.color });
+      const bucket = ev.calendar || 'Calendar';
+      if (!googleSources.has(bucket)) googleSources.set(bucket, { key: bucket, label: bucket, color: ev.color });
       const dedupeKey = `${ev.dayIso}:${ev.id}`;
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
@@ -145,7 +150,8 @@ export default async function DashboardPage({
         id: ev.id,
         title: ev.title,
         kind: 'gcal',
-        sourceKey: ev.calendarId,
+        sourceKey: bucket,
+        color: ev.color ?? undefined,
         href: ev.htmlLink ?? 'https://calendar.google.com',
         external: true,
         startMin: ev.startMin,
@@ -155,9 +161,11 @@ export default async function DashboardPage({
     }
   }
 
-  // The filter chips: Seaside Media first, then each Google calendar by name.
+  // Chips: "Seaside Media" first (app + any same-named Google calendar merged),
+  // then the other Google calendars by name.
+  googleSources.delete(SSM); // merged into the app's Seaside Media bucket
   const calSources: CalendarSource[] = [
-    { key: 'ssm', label: 'Seaside Media', color: '#14b8a6' },
+    { key: SSM, label: SSM, color: '#14b8a6' },
     ...[...googleSources.values()].sort((a, b) => a.label.localeCompare(b.label)),
   ];
 
