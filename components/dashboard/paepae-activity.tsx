@@ -14,7 +14,7 @@ export type PaepaeAction = {
   created_at: string;
 };
 
-// Friendly labels per action (mirrors the propose/execute action names).
+// Fallback labels per action, used only when a row has no stored result line.
 const ACTION_LABELS: Record<string, string> = {
   create_task: 'Created a task',
   update_task: 'Updated a task',
@@ -24,8 +24,25 @@ const ACTION_LABELS: Record<string, string> = {
   update_client: 'Updated a client',
   create_quote: 'Saved a draft quote',
   create_contract: 'Drafted a contract',
+  update_contract: 'Updated a contract',
   create_invoice: 'Created an invoice',
+  create_deliverable: 'Added a deliverable',
+  update_deliverable: 'Updated a deliverable',
+  create_milestone: 'Added a milestone',
+  update_milestone: 'Updated a milestone',
+  assign_contractor: 'Assigned a team member',
+  update_quote_status: 'Recorded a quote status',
+  update_invoice_status: 'Recorded an invoice status',
+  send_email: 'Sent an email',
+  create_event: 'Booked a meeting',
 };
+
+// The one-line headline for a row: PaePae's own result message is the most
+// specific and already reads well ("Created task 'Order gaffer tape'."), so we
+// lead with it and fall back to the generic label only when it's missing.
+function headline(a: PaepaeAction): string {
+  return a.result?.trim() || ACTION_LABELS[a.action] || a.action;
+}
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -57,7 +74,7 @@ export function PaepaeActivity({ actions }: { actions: PaepaeAction[] }) {
               aria-expanded={open}
               className="flex w-full items-center gap-2 py-2 text-left text-sm"
             >
-              <span className="text-ink">{ACTION_LABELS[a.action] ?? a.action}</span>
+              <span className="truncate text-ink">{headline(a)}</span>
               <span className="ml-auto shrink-0 text-[11px] text-slate-400">{timeAgo(a.created_at)}</span>
               <svg
                 width={13}
@@ -73,16 +90,14 @@ export function PaepaeActivity({ actions }: { actions: PaepaeAction[] }) {
                 <path d="m6 9 6 6 6-6" />
               </svg>
             </button>
-            {open && (
+            {open && a.summary.length > 0 && (
               <div className="mb-2 rounded-xl bg-slate-50 px-3 py-2 text-sm">
-                {a.result && <p className="font-medium text-slate-700">{a.result}</p>}
-                {a.summary.length > 0 && (
-                  <ul className="mt-1 space-y-0.5 text-xs text-slate-500">
-                    {a.summary.map((line, i) => (
-                      <li key={i}>{line}</li>
-                    ))}
-                  </ul>
-                )}
+                <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">Details</p>
+                <ul className="space-y-0.5 text-xs text-slate-500">
+                  {a.summary.map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ul>
               </div>
             )}
           </li>

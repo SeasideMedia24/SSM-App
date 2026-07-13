@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/server';
 import { getAppRole } from '@/lib/auth/role';
 import { Sidebar } from '@/components/sidebar';
 import { UndoProvider } from '@/components/undo/undo-provider';
+import { PaepaeDock } from '@/components/paepae/paepae-dock';
+import { TimezoneCookie } from '@/components/util/timezone-cookie';
 
 export default async function AppLayout({
   children,
@@ -60,6 +62,9 @@ export default async function AppLayout({
           <div className="brand-gradient h-1.5 w-full" />
           <div className="mx-auto max-w-6xl px-8 py-8">{children}</div>
         </main>
+        {/* PaePae, reachable from every tab; records the viewer's timezone. */}
+        <PaepaeDock />
+        <TimezoneCookie />
       </div>
     </UndoProvider>
   );

@@ -12,6 +12,16 @@ export type CalendarDay = {
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
+// Today's date (YYYY-MM-DD) in a given IANA timezone. en-CA formats as ISO, so
+// "today" is correct for the viewer even late at night when UTC has rolled over.
+export function todayInTz(tz: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
 export function isoOf(year: number, month: number, day: number): string {
   return `${year}-${pad(month)}-${pad(day)}`;
 }
@@ -61,14 +71,19 @@ export function daysInMonth({ year, month }: MonthRef): number {
 // ── Views (month / week / day) ───────────────────────────────────────────────
 
 export type CalView = 'month' | 'week' | 'day';
-export type CalSource = 'ssm' | 'personal' | 'all';
 
 export function parseView(v: string | undefined): CalView {
   return v === 'week' || v === 'day' ? v : 'month';
 }
 
-export function parseSource(v: string | undefined): CalSource {
-  return v === 'personal' || v === 'all' ? v : 'ssm';
+// Which calendar sources are hidden (?hide=key1,key2). Absent = show everything.
+export function parseHidden(v: string | undefined): Set<string> {
+  if (!v) return new Set();
+  return new Set(v.split(',').map((s) => s.trim()).filter(Boolean));
+}
+
+export function hideParam(hidden: Set<string>): string {
+  return [...hidden].join(',');
 }
 
 // The anchor is the date the view is centred on: ?cal=YYYY-MM-DD (a bare

@@ -28,7 +28,9 @@ export function googleConfigured(): boolean {
 export type GoogleEvent = {
   id: string;
   title: string;
-  calendar: string;
+  calendarId: string; // which Google calendar it came from (for filtering)
+  calendar: string; // that calendar's display name
+  color: string | null;
   dayIso: string;
   allDay: boolean;
   startMin?: number;
@@ -168,7 +170,16 @@ function timeLabelOf(hhmm: string): string {
 const minutesOf = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 
 // Fetch every included calendar's events for [firstIso, lastIso] (inclusive).
-export async function syncGoogleEvents(supabase: DB, firstIso: string, lastIso: string): Promise<GoogleSync> {
+// `tz` is the VIEWER's IANA timezone (e.g. America/New_York): we pass it to
+// Google so every returned dateTime is already in the viewer's wall-clock,
+// which is what makes the times line up on the grid (fixes the "3 hours off"
+// bug — before, Google returned each calendar's own zone and we sliced it raw).
+export async function syncGoogleEvents(
+  supabase: DB,
+  firstIso: string,
+  lastIso: string,
+  tz = 'America/New_York',
+): Promise<GoogleSync> {
   if (!googleConfigured()) return { status: 'unconfigured' };
   const account = await getGoogleAccount(supabase);
   if (!account) return { status: 'disconnected' };
@@ -180,7 +191,7 @@ export async function syncGoogleEvents(supabase: DB, firstIso: string, lastIso: 
 
   const { data: calendars } = await supabase
     .from('google_calendars')
-    .select('id, summary')
+    .select('id, summary, color')
     .eq('included', true)
     .limit(15);
   if (!calendars || calendars.length === 0) return { status: 'ok', events: [] };
@@ -197,11 +208,12 @@ export async function syncGoogleEvents(supabase: DB, firstIso: string, lastIso: 
           `${API}/calendars/${encodeURIComponent(cal.id)}/events` +
           `?singleEvents=true&orderBy=startTime&maxResults=250` +
           `&timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}` +
+          `&timeZone=${encodeURIComponent(tz)}` +
           `&fields=items(id,status,summary,htmlLink,start,end)`;
         const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
         if (!res.ok) return [];
         const json = (await res.json()) as { items?: RawEvent[] };
-        return (json.items ?? []).flatMap((ev) => normalize(ev, cal.summary, firstIso, lastIso));
+        return (json.items ?? []).flatMap((ev) => normalize(ev, cal.id, cal.summary, cal.color ?? null, firstIso, lastIso));
       }),
     );
     return { status: 'ok', events: perCalendar.flat() };
@@ -211,10 +223,17 @@ export async function syncGoogleEvents(supabase: DB, firstIso: string, lastIso: 
 }
 
 // Expand one raw Google event into per-day calendar entries within the range.
-function normalize(ev: RawEvent, calendar: string, firstIso: string, lastIso: string): GoogleEvent[] {
+function normalize(
+  ev: RawEvent,
+  calendarId: string,
+  calendar: string,
+  color: string | null,
+  firstIso: string,
+  lastIso: string,
+): GoogleEvent[] {
   if (!ev.id || ev.status === 'cancelled') return [];
   const title = ev.summary?.trim() || '(untitled)';
-  const base = { id: ev.id, title, calendar, htmlLink: ev.htmlLink };
+  const base = { id: ev.id, title, calendarId, calendar, color, htmlLink: ev.htmlLink };
 
   // All-day: start.date is inclusive, end.date is EXCLUSIVE — one entry per day.
   if (ev.start?.date) {

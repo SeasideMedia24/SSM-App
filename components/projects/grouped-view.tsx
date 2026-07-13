@@ -26,8 +26,8 @@ export function GroupedByProject({
   projectView: string; // ?view= param when linking into the project
   setStatus?: SetStatus; // when provided, rows get an inline status picker
 }) {
-  // Hidden = filtered out via chips; collapsed = folded via the per-box dropdown.
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  // Collapsed = folded via the per-box dropdown. (The project filter chips were
+  // removed — the per-box fold is enough.)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const toggle = (set: Set<string>, id: string) => {
@@ -37,36 +37,12 @@ export function GroupedByProject({
     return next;
   };
 
-  const visible = groups.filter((g) => !hidden.has(g.id));
-
   return (
     <div className="space-y-4">
-      {/* Filter chips — click to hide/show a project. */}
-      {groups.length > 1 && (
-        <div className="flex flex-wrap gap-2">
-          {groups.map((g) => {
-            const on = !hidden.has(g.id);
-            return (
-              <button
-                key={g.id}
-                type="button"
-                onClick={() => setHidden((prev) => toggle(prev, g.id))}
-                aria-pressed={on}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                  on ? 'border-teal bg-teal/10 text-sea' : 'border-slate-200 text-slate-400 hover:text-slate-600'
-                }`}
-              >
-                {g.title}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {visible.length === 0 ? (
-        <p className="py-4 text-sm text-slate-400">No projects selected — pick one above.</p>
+      {groups.length === 0 ? (
+        <p className="py-4 text-sm text-slate-400">Nothing here yet.</p>
       ) : (
-        visible.map((g) => {
+        groups.map((g) => {
           const open = !collapsed.has(g.id);
           return (
             <section key={g.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

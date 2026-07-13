@@ -8,7 +8,8 @@ import {
   monthGrid,
   parseAnchor,
   parseView,
-  parseSource,
+  parseHidden,
+  hideParam,
   addDays,
   weekBounds,
   weekDays,
@@ -91,7 +92,7 @@ describe('monthGrid', () => {
   });
 });
 
-describe('parseAnchor / parseView / parseSource', () => {
+describe('parseAnchor / parseView / hidden-source filter', () => {
   it('accepts a full date and a bare month', () => {
     expect(parseAnchor('2026-03-15', TODAY)).toBe('2026-03-15');
     expect(parseAnchor('2026-03', TODAY)).toBe('2026-03-01');
@@ -103,11 +104,17 @@ describe('parseAnchor / parseView / parseSource', () => {
     }
   });
 
-  it('defaults view and source safely', () => {
+  it('defaults view safely', () => {
     expect(parseView('week')).toBe('week');
     expect(parseView('nope')).toBe('month');
-    expect(parseSource('personal')).toBe('personal');
-    expect(parseSource(undefined)).toBe('ssm');
+  });
+
+  it('parses the hidden-source list and round-trips it', () => {
+    expect(parseHidden(undefined)).toEqual(new Set()); // absent = show everything
+    expect(parseHidden('ssm,cal_abc')).toEqual(new Set(['ssm', 'cal_abc']));
+    expect(parseHidden(' ssm , , cal_abc ')).toEqual(new Set(['ssm', 'cal_abc']));
+    expect(hideParam(new Set(['ssm', 'cal_abc']))).toBe('ssm,cal_abc');
+    expect(hideParam(new Set())).toBe('');
   });
 });
 

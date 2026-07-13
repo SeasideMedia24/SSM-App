@@ -1,11 +1,12 @@
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
 import { proj, type ProjRel } from '@/components/projects/global-table';
 import { PaepaeActivity, type PaepaeAction } from '@/components/dashboard/paepae-activity';
 import { DashboardMetrics, type MetricDef, type MetricItem } from '@/components/dashboard/metrics';
-import { CalendarBlock, type CalendarItem, type GoogleStatus } from '@/components/dashboard/calendar-block';
-import { parseAnchor, parseView, parseSource, rangeForView } from '@/lib/dashboard/calendar';
+import { CalendarBlock, type CalendarItem, type CalendarSource, type GoogleStatus } from '@/components/dashboard/calendar-block';
+import { parseAnchor, parseView, parseHidden, rangeForView, todayInTz } from '@/lib/dashboard/calendar';
 import { syncGoogleEvents } from '@/lib/google/calendar';
 import { fmtDate, money } from '@/lib/projects/format';
 import { quoteStatusMeta, projectStatusMeta } from '@/lib/projects/status';
@@ -14,18 +15,22 @@ import type { QuoteStatus, ProjectStatus } from '@/types/database.types';
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cal?: string; view?: string; src?: string }>;
+  searchParams: Promise<{ cal?: string; view?: string; hide?: string }>;
 }) {
-  const { cal, view: viewParam, src: srcParam } = await searchParams;
+  const { cal, view: viewParam, hide: hideParam } = await searchParams;
   const supabase = await createClient();
   const now = new Date();
-  const today = now.toISOString().slice(0, 10);
+
+  // The viewer's timezone (set by the TimezoneCookie in the app layout) so
+  // Google times render in the viewer's own zone; defaults to the studio's.
+  const tz = (await cookies()).get('ssm_tz')?.value || 'America/New_York';
+  const today = todayInTz(tz);
   const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString();
 
-  // Calendar block state: which view (month/week/day), which source tab, and
-  // the date it's centred on — all from the URL so it's linkable.
+  // Calendar block state: which view (month/week/day), which sources are hidden,
+  // and the date it's centred on — all from the URL so it's linkable.
   const calView = parseView(viewParam);
-  const calSrc = parseSource(srcParam);
+  const calHidden = parseHidden(hideParam);
   const calAnchor = parseAnchor(cal, today);
   const { first: calFirst, last: calLast } = rangeForView(calView, calAnchor);
 
@@ -89,49 +94,58 @@ export default async function DashboardPage({
     date: fmtDate(inv.due_date),
   }));
 
-  // Google Calendar events for the Personal / Everything tabs. Only fetched
-  // when the active tab shows them; failures degrade to a banner, never a crash.
-  const googleSync = calSrc !== 'ssm' ? await syncGoogleEvents(supabase, calFirst, calLast) : null;
-  const google: GoogleStatus = googleSync
-    ? googleSync.status === 'ok'
+  // Google Calendar events for the range, in the viewer's timezone. Fetched
+  // whenever connected (the chips filter which show); failures → a banner.
+  const googleSync = await syncGoogleEvents(supabase, calFirst, calLast, tz);
+  const google: GoogleStatus =
+    googleSync.status === 'ok'
       ? { status: 'ok' }
-      : { status: googleSync.status, message: 'message' in googleSync ? googleSync.message : undefined }
-    : { status: 'ok' };
+      : { status: googleSync.status, message: 'message' in googleSync ? googleSync.message : undefined };
 
-  // Group the range's dated items by day for the calendar block, honouring the
-  // active source tab. Tasks may have no project — those link to My Tasks.
+  // Group the range's dated items by day. Every item carries a sourceKey so the
+  // calendar's filter chips can show/hide it. Tasks may have no project — those
+  // link to My Tasks.
   const itemsByDay: Record<string, CalendarItem[]> = {};
   const addCal = (iso: string | null, item: CalendarItem) => {
     if (!iso) return;
     (itemsByDay[iso] ??= []).push(item);
   };
 
-  if (calSrc !== 'personal') {
-    for (const m of calMilestones ?? []) {
-      addCal(m.date, { id: m.id, title: m.title, kind: 'milestone', href: `/projects/${m.project_id}`, done: m.status === 'done' });
-    }
-    for (const p of calProjects ?? []) {
-      addCal(p.due_date, { id: p.id, title: p.title, kind: 'project', href: `/projects/${p.id}` });
-    }
-    for (const d of calDeliverables ?? []) {
-      addCal(d.due_date, { id: d.id, title: d.title, kind: 'deliverable', href: `/projects/${d.project_id}?view=deliverables`, done: d.status === 'done' });
-    }
-    for (const t of calTasks ?? []) {
-      addCal(t.due_date, {
-        id: t.id,
-        title: t.title,
-        kind: 'task',
-        href: t.project_id ? `/projects/${t.project_id}?view=tasks` : '/my-tasks',
-        done: t.status === 'done',
-      });
-    }
+  for (const m of calMilestones ?? []) {
+    addCal(m.date, { id: m.id, title: m.title, kind: 'milestone', sourceKey: 'ssm', href: `/projects/${m.project_id}`, done: m.status === 'done' });
   }
-  if (googleSync?.status === 'ok') {
+  for (const p of calProjects ?? []) {
+    addCal(p.due_date, { id: p.id, title: p.title, kind: 'project', sourceKey: 'ssm', href: `/projects/${p.id}` });
+  }
+  for (const d of calDeliverables ?? []) {
+    addCal(d.due_date, { id: d.id, title: d.title, kind: 'deliverable', sourceKey: 'ssm', href: `/projects/${d.project_id}?view=deliverables`, done: d.status === 'done' });
+  }
+  for (const t of calTasks ?? []) {
+    addCal(t.due_date, {
+      id: t.id,
+      title: t.title,
+      kind: 'task',
+      sourceKey: 'ssm',
+      href: t.project_id ? `/projects/${t.project_id}?view=tasks` : '/my-tasks',
+      done: t.status === 'done',
+    });
+  }
+
+  // Google events, deduped by (day + id) so an event shared across two included
+  // calendars shows once rather than colliding.
+  const googleSources = new Map<string, CalendarSource>();
+  if (googleSync.status === 'ok') {
+    const seen = new Set<string>();
     for (const ev of googleSync.events) {
+      googleSources.set(ev.calendarId, { key: ev.calendarId, label: ev.calendar || 'Calendar', color: ev.color });
+      const dedupeKey = `${ev.dayIso}:${ev.id}`;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
       addCal(ev.dayIso, {
         id: ev.id,
         title: ev.title,
         kind: 'gcal',
+        sourceKey: ev.calendarId,
         href: ev.htmlLink ?? 'https://calendar.google.com',
         external: true,
         startMin: ev.startMin,
@@ -140,6 +154,13 @@ export default async function DashboardPage({
       });
     }
   }
+
+  // The filter chips: Seaside Media first, then each Google calendar by name.
+  const calSources: CalendarSource[] = [
+    { key: 'ssm', label: 'Seaside Media', color: '#14b8a6' },
+    ...[...googleSources.values()].sort((a, b) => a.label.localeCompare(b.label)),
+  ];
+
   // Within each day: all-day/app items first, then timed events by start time.
   for (const list of Object.values(itemsByDay)) {
     list.sort((a, b) => (a.startMin ?? -1) - (b.startMin ?? -1));
@@ -193,10 +214,11 @@ export default async function DashboardPage({
       <div className="mt-6">
         <CalendarBlock
           view={calView}
-          src={calSrc}
           anchor={calAnchor}
           todayIso={today}
           itemsByDay={itemsByDay}
+          sources={calSources}
+          hidden={calHidden}
           google={google}
         />
       </div>

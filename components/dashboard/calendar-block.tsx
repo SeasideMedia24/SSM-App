@@ -1,15 +1,12 @@
 // Dashboard calendar — a real calendar, Apple-style.
 //
 // Three views: Month (Sun–Sat grid, day number top-right), Week, and Day (an
-// all-day strip plus a 12 AM → 11:59 PM time grid). Three sources as tabs:
-//   Seaside Media  — the app's own schedule (tasks, deliverables, milestones,
-//                    project due dates)
-//   Personal       — Google Calendar events (whichever calendars are enabled
-//                    in Settings, e.g. just "Home")
-//   Everything     — both together
+// all-day strip plus a 12 AM → 11:59 PM time grid).
 //
-// Still a server component with zero client JS: view/source/date navigation is
-// all plain links (?view=&src=&cal=).
+// Sources are FILTER CHIPS, not fixed tabs: "Seaside Media" (the app's own
+// schedule) plus one chip per connected Google calendar. Everything is shown by
+// default; clicking a chip hides that source. Hidden sources ride in the URL
+// (?hide=key1,key2), so the whole thing stays a zero-JS server component.
 
 import Link from 'next/link';
 import {
@@ -19,8 +16,8 @@ import {
   navAnchors,
   viewLabel,
   weekdayShort,
+  hideParam,
   type CalView,
-  type CalSource,
 } from '@/lib/dashboard/calendar';
 
 export type CalendarItemKind = 'task' | 'deliverable' | 'milestone' | 'project' | 'gcal';
@@ -29,6 +26,7 @@ export type CalendarItem = {
   id: string;
   title: string;
   kind: CalendarItemKind;
+  sourceKey: string; // 'ssm' for app items; the Google calendar id for gcal items
   href: string;
   external?: boolean; // gcal items open Google Calendar in a new tab
   done?: boolean;
@@ -37,6 +35,9 @@ export type CalendarItem = {
   endMin?: number;
   timeLabel?: string;
 };
+
+// One selectable source: Seaside Media, or one of the user's Google calendars.
+export type CalendarSource = { key: string; label: string; color: string | null };
 
 export type GoogleStatus = {
   status: 'ok' | 'disconnected' | 'unconfigured' | 'error';
@@ -52,12 +53,6 @@ const KIND_STYLE: Record<CalendarItemKind, { pill: string; block: string; dot: s
   gcal: { pill: 'bg-rose-100 text-rose-700', block: 'border-rose-400 bg-rose-100 text-rose-800', dot: 'bg-rose-400', label: 'Google Calendar' },
 };
 
-const SRC_TABS: { key: CalSource; label: string }[] = [
-  { key: 'ssm', label: 'Seaside Media' },
-  { key: 'personal', label: 'Personal' },
-  { key: 'all', label: 'Everything' },
-];
-
 const VIEW_TABS: { key: CalView; label: string }[] = [
   { key: 'month', label: 'Month' },
   { key: 'week', label: 'Week' },
@@ -68,94 +63,106 @@ const HOUR_PX = 44; // height of one hour row in the week/day time grid
 
 export function CalendarBlock({
   view,
-  src,
   anchor,
   todayIso,
   itemsByDay,
+  sources,
+  hidden,
   google,
 }: {
   view: CalView;
-  src: CalSource;
   anchor: string;
   todayIso: string;
   itemsByDay: Record<string, CalendarItem[]>;
+  sources: CalendarSource[];
+  hidden: Set<string>;
   google: GoogleStatus;
 }) {
-  const url = (v: CalView, s: CalSource, cal?: string) =>
-    `/dashboard?view=${v}&src=${s}${cal ? `&cal=${cal}` : ''}`;
+  // Keep the active view + hidden-source filter in every link.
+  const url = (v: CalView, cal?: string, hide: Set<string> = hidden) => {
+    const h = hideParam(hide);
+    return `/dashboard?view=${v}${cal ? `&cal=${cal}` : ''}${h ? `&hide=${h}` : ''}`;
+  };
   const { prev, next } = navAnchors(view, anchor);
+
+  // Filter each day's items to the sources that aren't hidden.
+  const visibleByDay: Record<string, CalendarItem[]> = {};
+  for (const [iso, items] of Object.entries(itemsByDay)) {
+    const kept = items.filter((i) => !hidden.has(i.sourceKey));
+    if (kept.length > 0) visibleByDay[iso] = kept;
+  }
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      {/* Row 1: title + source tabs */}
+      {/* Row 1: title + view tabs */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-slate-900">Calendar</h2>
         <Segmented>
-          {SRC_TABS.map((t) => (
-            <SegLink key={t.key} href={url(view, t.key, anchor)} active={src === t.key}>
-              {t.label}
-            </SegLink>
-          ))}
-        </Segmented>
-      </div>
-
-      {/* Row 2: date nav + view tabs */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-1">
-          <NavArrow href={url(view, src, prev)} label="Previous" dir="left" />
-          <span className="min-w-44 text-center text-sm font-medium text-ink">{viewLabel(view, anchor)}</span>
-          <NavArrow href={url(view, src, next)} label="Next" dir="right" />
-          <Link
-            href={url(view, src)}
-            scroll={false}
-            className="ml-2 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition-colors hover:border-teal hover:text-sea"
-          >
-            Today
-          </Link>
-        </div>
-        <Segmented>
           {VIEW_TABS.map((t) => (
-            <SegLink key={t.key} href={url(t.key, src, anchor)} active={view === t.key}>
+            <SegLink key={t.key} href={url(t.key, anchor)} active={view === t.key}>
               {t.label}
             </SegLink>
           ))}
         </Segmented>
       </div>
 
-      {/* Google connection notice on the tabs that need it */}
-      {src !== 'ssm' && google.status !== 'ok' && (
-        <p className="mb-4 rounded-xl bg-aqua/10 px-3 py-2 text-sm text-sea">
-          {google.status === 'error'
-            ? (google.message ?? 'Could not reach Google Calendar right now.')
-            : (
-              <>
-                Personal events come from Google Calendar —{' '}
-                <Link href="/settings#google-calendar" className="font-medium underline">
-                  connect it in Settings
-                </Link>{' '}
-                to see them here.
-              </>
-            )}
+      {/* Row 2: date nav */}
+      <div className="mb-3 flex items-center gap-1">
+        <NavArrow href={url(view, prev)} label="Previous" dir="left" />
+        <span className="min-w-44 text-center text-sm font-medium text-ink">{viewLabel(view, anchor)}</span>
+        <NavArrow href={url(view, next)} label="Next" dir="right" />
+        <Link
+          href={url(view)}
+          scroll={false}
+          className="ml-2 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition-colors hover:border-teal hover:text-sea"
+        >
+          Today
+        </Link>
+      </div>
+
+      {/* Source filter chips — click to hide/show a calendar. */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        {sources.map((s) => {
+          const on = !hidden.has(s.key);
+          const nextHidden = new Set(hidden);
+          if (on) nextHidden.add(s.key);
+          else nextHidden.delete(s.key);
+          return (
+            <Link
+              key={s.key}
+              href={url(view, anchor, nextHidden)}
+              scroll={false}
+              aria-pressed={on}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${
+                on ? 'border-teal bg-teal/10 text-sea' : 'border-slate-200 text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: on ? (s.color ?? '#14b8a6') : '#cbd5e1' }}
+              />
+              {s.label}
+            </Link>
+          );
+        })}
+        {google.status === 'disconnected' && (
+          <Link href="/settings#google-calendar" className="text-xs text-sea hover:underline">
+            + Connect Google Calendar
+          </Link>
+        )}
+      </div>
+
+      {google.status === 'error' && (
+        <p className="mb-4 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {google.message ?? 'Could not reach Google Calendar right now.'}
         </p>
       )}
 
       {view === 'month' ? (
-        <MonthView anchor={anchor} todayIso={todayIso} itemsByDay={itemsByDay} />
+        <MonthView anchor={anchor} todayIso={todayIso} itemsByDay={visibleByDay} />
       ) : (
-        <TimeGridView days={view === 'day' ? [anchor] : weekDays(anchor)} todayIso={todayIso} itemsByDay={itemsByDay} />
+        <TimeGridView days={view === 'day' ? [anchor] : weekDays(anchor)} todayIso={todayIso} itemsByDay={visibleByDay} />
       )}
-
-      {/* Legend */}
-      <div className="mt-3 flex flex-wrap items-center gap-4 text-[11px] text-slate-500">
-        {(Object.keys(KIND_STYLE) as CalendarItemKind[])
-          .filter((k) => (src === 'personal' ? k === 'gcal' : src === 'ssm' ? k !== 'gcal' : true))
-          .map((kind) => (
-            <span key={kind} className="inline-flex items-center gap-1.5">
-              <span className={`h-2 w-2 rounded-full ${KIND_STYLE[kind].dot}`} />
-              {KIND_STYLE[kind].label}
-            </span>
-          ))}
-      </div>
     </section>
   );
 }
@@ -204,8 +211,8 @@ function MonthView({
                   </span>
                 </div>
                 <div className="mt-0.5 space-y-0.5">
-                  {items.slice(0, MAX_PER_DAY).map((item) => (
-                    <Pill key={`${item.kind}-${item.id}-${day.iso}`} item={item} />
+                  {items.slice(0, MAX_PER_DAY).map((item, i) => (
+                    <Pill key={`${day.iso}-${i}`} item={item} />
                   ))}
                   {items.length > MAX_PER_DAY && (
                     <p className="px-1 text-[10px] text-slate-400">+{items.length - MAX_PER_DAY} more</p>
@@ -264,8 +271,8 @@ function TimeGridView({
           <span className="py-1 pr-1 text-right text-[10px] uppercase text-slate-400">all-day</span>
           {days.map((iso) => (
             <div key={iso} className={`space-y-0.5 border-l border-slate-100 p-1 ${iso === todayIso ? 'bg-aqua/5' : ''}`}>
-              {allDayOf(iso).map((item) => (
-                <Pill key={`${item.kind}-${item.id}-${iso}`} item={item} />
+              {allDayOf(iso).map((item, i) => (
+                <Pill key={`${iso}-ad-${i}`} item={item} />
               ))}
             </div>
           ))}
@@ -297,13 +304,13 @@ function TimeGridView({
                 <div key={h} className="border-t border-slate-100" style={{ height: HOUR_PX }} />
               ))}
               {/* Timed events, absolutely positioned by start/duration */}
-              {timedOf(iso).map((item) => {
+              {timedOf(iso).map((item, i) => {
                 const top = ((item.startMin ?? 0) / 60) * HOUR_PX;
                 const height = Math.max((((item.endMin ?? 0) - (item.startMin ?? 0)) / 60) * HOUR_PX, 18);
                 const style = KIND_STYLE[item.kind];
                 return (
                   <a
-                    key={`${item.kind}-${item.id}`}
+                    key={`${iso}-t-${i}`}
                     href={item.href}
                     {...(item.external ? { target: '_blank', rel: 'noreferrer' } : {})}
                     title={`${item.timeLabel ?? ''} ${item.title}`.trim()}
