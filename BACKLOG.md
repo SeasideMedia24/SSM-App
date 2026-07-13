@@ -30,9 +30,17 @@ draft contracts. (Details under "Recently shipped".)
 
 ## 🗺️ Next up
 
-- **Contractors — Slice B: ✍️ PLAN WRITTEN, awaiting owner's 4 answers** —
-  see **docs/CONTRACTOR-LOGINS-PLAN.md** (scope table, RLS rewrite, invite flow
-  via Supabase's own auth emails, test gate). Answer §5 and B1 builds in one go.
+- **Contractors — Slice B1: 🔨 BUILT 2026-07-12, pending activation** — owner
+  answered the plan's questions (visibility as proposed; task edits = status +
+  worker note). Shipped: migration 20260712000001 (roles, full RLS rewrite,
+  column-guard triggers, invite linking, tasks.worker_note), "Invite to log in"
+  on contractor pages, /auth/confirm + /welcome, the (work) My Work + My
+  Profile surface, owner task-assignee picker, owner-only guards on PaePae +
+  Google routes, and `scripts/security-gate.mjs`. **To activate: owner runs the
+  migration → Claude runs the gate → gate must pass → first pilot invite.**
+  (Also add `http://localhost:3000/**` under Supabase Auth → URL Configuration
+  → Redirect URLs so invite emails land on /welcome.) Slice B2 (messaging
+  groundwork, notifications) follows once B1 is live.
 - **Contractors — nice-to-haves**: show a project's assigned team on the project
   page; roll assignment costs into the project budget.
 - **App-wide niceties**: ✅ CMD-Z undo v1 (2026-07-12: board drags + task/

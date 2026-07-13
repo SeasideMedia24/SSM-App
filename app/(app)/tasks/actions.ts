@@ -100,3 +100,25 @@ export async function deleteTask(formData: FormData) {
   revalidatePath(`/projects/${projectId}`);
   revalidatePath('/my-tasks');
 }
+
+// ── Slice B1: assign a task to a team member with a login ───────────────────
+// assignee_id points at the contractor's auth user (profiles.id), which only
+// exists once they've accepted their login invite. Owner-only via RLS.
+export async function setTaskAssignee(taskId: string, projectId: string, assigneeId: string | null) {
+  if (typeof taskId !== 'string' || taskId.length === 0) return;
+  const supabase = await createSupabaseServer();
+
+  if (assigneeId !== null) {
+    // Only a linked team member's user id is a valid assignee.
+    const { data: contractor } = await supabase
+      .from('contractors')
+      .select('id')
+      .eq('user_id', assigneeId)
+      .maybeSingle();
+    if (!contractor) return;
+  }
+
+  await supabase.from('tasks').update({ assignee_id: assigneeId }).eq('id', taskId);
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath('/my-tasks');
+}

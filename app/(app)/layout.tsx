@@ -4,6 +4,7 @@
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { getAppRole } from '@/lib/auth/role';
 import { Sidebar } from '@/components/sidebar';
 import { UndoProvider } from '@/components/undo/undo-provider';
 
@@ -19,6 +20,12 @@ export default async function AppLayout({
 
   if (!user) {
     redirect('/login');
+  }
+
+  // Team members get their own scoped surface — the owner app is owner-only.
+  // (RLS would blank these pages for them anyway; this routing is the polite layer.)
+  if ((await getAppRole(supabase)) === 'contractor') {
+    redirect('/my-work');
   }
 
   // Notification counts for the menu badges. head:true fetches only counts (no

@@ -1,9 +1,10 @@
 # Contractors Slice B — Team Logins & Permissions (PLAN)
 
-**Status: plan for review — no code yet.** This is the security-critical step
-where the app stops being single-user, so per CLAUDE.md it gets a deliberate,
-reviewed plan before anything is built. Read it top to bottom once; the
-"Decisions Jeremy makes" section at the end is the part that needs your input.
+**Status: B1 BUILT (2026-07-12) — awaiting migration 20260712000001 + the
+security gate.** Owner decisions were made in-session: visibility as proposed;
+task edits = status + a worker note; build now. Deviations from the original
+plan: none besides the added `worker_note`. The test gate below is automated
+in `scripts/security-gate.mjs` — it must pass before the first real invite.
 
 ---
 

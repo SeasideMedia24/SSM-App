@@ -115,3 +115,60 @@ export async function unassignProject(formData: FormData) {
 
   if (contractorId) revalidatePath(`/contractors/${contractorId}`);
 }
+
+// ── Slice B1: invite a contractor to log in ──────────────────────────────────
+// Uses the ADMIN client (service role) because creating auth users is an admin
+// operation — so we explicitly verify the caller is the owner first. Supabase
+// sends the invite email itself (no email integration needed). The signup
+// trigger links the new auth user to this contractor row and stamps their
+// role as 'contractor'.
+
+export type InviteLoginResult = { ok: boolean; message: string };
+
+export async function inviteContractorLogin(contractorId: string): Promise<InviteLoginResult> {
+  if (typeof contractorId !== 'string' || contractorId.length === 0) {
+    return { ok: false, message: 'Missing contractor.' };
+  }
+
+  const supabase = await createSupabaseServer();
+  const { getAppRole } = await import('@/lib/auth/role');
+  if ((await getAppRole(supabase)) !== 'owner') {
+    return { ok: false, message: 'Only the owner can send login invites.' };
+  }
+
+  // RLS-scoped read; the owner sees every contractor.
+  const { data: contractor } = await supabase
+    .from('contractors')
+    .select('id, name, email, user_id')
+    .eq('id', contractorId)
+    .maybeSingle();
+  if (!contractor) return { ok: false, message: 'Contractor not found.' };
+  if (contractor.user_id) return { ok: false, message: 'They already have a login.' };
+  if (!contractor.email) {
+    return { ok: false, message: 'Add an email address to this contractor first (Edit).' };
+  }
+
+  const { headers } = await import('next/headers');
+  const h = await headers();
+  const proto = h.get('x-forwarded-proto') ?? 'http';
+  const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000';
+
+  const { createAdminClient } = await import('@/lib/supabase/admin');
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.inviteUserByEmail(contractor.email, {
+    data: { full_name: contractor.name, contractor_id: contractor.id },
+    redirectTo: `${proto}://${host}/welcome`,
+  });
+  if (error) {
+    const already = /already.*(registered|exists)/i.test(error.message);
+    return {
+      ok: false,
+      message: already
+        ? 'That email already has an account. If it’s theirs, they can just log in.'
+        : 'Could not send the invite. Please try again.',
+    };
+  }
+
+  revalidatePath(`/contractors/${contractorId}`);
+  return { ok: true, message: `Invite emailed to ${contractor.email}.` };
+}

@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getAppRole } from '@/lib/auth/role';
 import { googleConfigured, syncCalendarList } from '@/lib/google/calendar';
 
 export const runtime = 'nodejs';
@@ -22,6 +23,9 @@ export async function GET(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.redirect(new URL('/login', origin));
+  if ((await getAppRole(supabase)) !== 'owner') {
+    return NextResponse.redirect(new URL('/my-work', origin));
+  }
   if (!googleConfigured()) return done('missing-env');
 
   const params = req.nextUrl.searchParams;

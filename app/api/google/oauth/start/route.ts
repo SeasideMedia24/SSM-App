@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getAppRole } from '@/lib/auth/role';
 import { googleConfigured } from '@/lib/google/calendar';
 
 export const runtime = 'nodejs';
@@ -14,6 +15,10 @@ export async function GET(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.redirect(new URL('/login', req.nextUrl.origin));
+  // The Google connection (calendar + Gmail sending) is the owner's alone.
+  if ((await getAppRole(supabase)) !== 'owner') {
+    return NextResponse.redirect(new URL('/my-work', req.nextUrl.origin));
+  }
 
   if (!googleConfigured()) {
     // Clear pointer instead of a cryptic Google error page.

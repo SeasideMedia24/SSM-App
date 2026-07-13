@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/page-header';
 import { buttonClass } from '@/components/ui/button-styles';
 import { DeleteContractorButton } from '@/components/contractors/delete-contractor-button';
 import { OnboardLinkControl } from '@/components/contractors/onboard-link-control';
+import { InviteLoginControl } from '@/components/contractors/invite-login-control';
 import { assignProject, unassignProject } from '../actions';
 import { contractorTypeMeta } from '@/lib/projects/status';
 import { money, contractorRatesSummary } from '@/lib/projects/format';
@@ -80,6 +81,16 @@ export default async function ContractorDetailPage({
           Share a private link so {contractor.name.split(' ')[0]} can fill in their own contact details and rates. No login needed.
         </p>
         <OnboardLinkControl contractorId={contractor.id} token={contractor.onboard_token} onboardedAt={contractor.onboarded_at} />
+      </section>
+
+      {/* Team login (Slice B1) */}
+      <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-1 text-sm font-semibold text-slate-900">App login</h2>
+        <p className="mb-3 text-xs text-slate-400">
+          Give {contractor.name.split(' ')[0]} their own login. They&rsquo;ll see only their assigned projects
+          and tasks — never money, clients, or anyone else&rsquo;s details.
+        </p>
+        <InviteLoginControl contractorId={contractor.id} email={contractor.email} linked={!!contractor.user_id} />
       </section>
 
       {/* Project assignments */}

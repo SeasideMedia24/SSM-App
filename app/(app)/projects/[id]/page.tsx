@@ -44,14 +44,17 @@ export default async function ProjectDetailPage({
   const [
     { data: tasks }, { data: deliverables }, { data: contracts },
     { data: quotes }, { data: roles }, { data: services }, { data: configRows },
+    { data: teamLogins },
   ] = await Promise.all([
-    supabase.from('tasks').select('id, title, status, priority, due_date').eq('project_id', id).order('created_at'),
+    supabase.from('tasks').select('id, title, status, priority, due_date, assignee_id, worker_note').eq('project_id', id).order('created_at'),
     supabase.from('deliverables').select('*').eq('project_id', id).order('position'),
     supabase.from('contracts').select('*').eq('project_id', id).order('position'),
     supabase.from('quotes').select('id, title, status, total, calculator_state, created_at').eq('project_id', id).order('created_at', { ascending: false }),
     supabase.from('pricing_roles').select('*').order('sort'),
     supabase.from('pricing_page_services').select('*').order('sort'),
     supabase.from('pricing_config').select('*'),
+    // Team members with logins — the assignable people for this project's tasks.
+    supabase.from('contractors').select('name, user_id').not('user_id', 'is', null).order('name'),
   ]);
 
   const meta = projectStatusMeta(project.status);
@@ -110,7 +113,15 @@ export default async function ProjectDetailPage({
 
       <ViewSwitcher active={view} />
 
-      {view === 'tasks' && <TasksPanel projectId={project.id} tasks={taskList} />}
+      {view === 'tasks' && (
+        <TasksPanel
+          projectId={project.id}
+          tasks={taskList}
+          assignees={(teamLogins ?? [])
+            .filter((t): t is { name: string; user_id: string } => t.user_id != null)
+            .map((t) => ({ id: t.user_id, name: t.name }))}
+        />
+      )}
       {view === 'deliverables' && <DeliverablesPanel projectId={project.id} items={deliverables ?? []} />}
       {view === 'contracts' && <ContractsPanel projectId={project.id} items={contracts ?? []} />}
       {view === 'budget' && <QuoteBudget rows={budgetRows} />}

@@ -22,6 +22,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import type Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@/lib/supabase/server';
+import { getAppRole } from '@/lib/auth/role';
 import { getAnthropic, PAEPAE_MODEL } from '@/lib/paepae/client';
 import { paepaeSystemPrompt } from '@/lib/paepae/system';
 import { allPaepaeTools, runTool, actionFromToolName } from '@/lib/paepae/tools';
@@ -73,6 +74,11 @@ export async function POST(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return new Response('Unauthorized', { status: 401 });
+  // PaePae is owner-only (Slice B1): she can read the whole studio, so team
+  // logins don't get to talk to her.
+  if ((await getAppRole(supabase)) !== 'owner') {
+    return new Response('PaePae is only available to the owner.', { status: 403 });
+  }
 
   // 2. Validate input server-side (never trust the client).
   let json: unknown;

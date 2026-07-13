@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { getAppRole } from '@/lib/auth/role';
 import {
   isActionName,
   executeAction,
@@ -28,6 +29,10 @@ export async function POST(req: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  }
+  // PaePae is owner-only (Slice B1) — same gate as the chat route.
+  if ((await getAppRole(supabase)) !== 'owner') {
+    return NextResponse.json({ ok: false, error: 'PaePae is only available to the owner.' }, { status: 403 });
   }
 
   let body: unknown;
