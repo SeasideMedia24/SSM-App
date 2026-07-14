@@ -953,6 +953,7 @@ export type Database = {
           color: string | null;
           is_primary: boolean;
           included: boolean;
+          merge_ssm: boolean;
         };
         Insert: {
           user_id: string;
@@ -961,6 +962,7 @@ export type Database = {
           color?: string | null;
           is_primary?: boolean;
           included?: boolean;
+          merge_ssm?: boolean;
         };
         Update: {
           user_id?: string;
@@ -969,6 +971,7 @@ export type Database = {
           color?: string | null;
           is_primary?: boolean;
           included?: boolean;
+          merge_ssm?: boolean;
         };
         Relationships: [];
       };

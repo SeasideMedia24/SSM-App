@@ -15,6 +15,15 @@ export async function setCalendarIncluded(calendarId: string, included: boolean)
   revalidatePath('/dashboard');
 }
 
+// Fold a Google calendar's events under the "Seaside Media" chip (with app tasks).
+export async function setCalendarMergeSsm(calendarId: string, merge: boolean) {
+  if (typeof calendarId !== 'string' || calendarId.length === 0) return;
+  const supabase = await createClient();
+  await supabase.from('google_calendars').update({ merge_ssm: Boolean(merge) }).eq('id', calendarId);
+  revalidatePath('/settings');
+  revalidatePath('/dashboard');
+}
+
 // Disconnect entirely: forget the tokens and the mirrored calendar list.
 // (Reconnecting later just repeats the consent flow.)
 export async function disconnectGoogle() {

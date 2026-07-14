@@ -141,8 +141,11 @@ export default async function DashboardPage({
   if (googleSync.status === 'ok') {
     const seen = new Set<string>();
     for (const ev of googleSync.events) {
-      const bucket = ev.calendar || 'Calendar';
-      if (!googleSources.has(bucket)) googleSources.set(bucket, { key: bucket, label: bucket, color: ev.color });
+      // A calendar flagged "merge into Seaside Media" shares the app's bucket.
+      const bucket = ev.mergeSsm ? SSM : ev.calendar || 'Calendar';
+      if (bucket !== SSM && !googleSources.has(bucket)) {
+        googleSources.set(bucket, { key: bucket, label: bucket, color: ev.color });
+      }
       const dedupeKey = `${ev.dayIso}:${ev.id}`;
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);

@@ -31,6 +31,7 @@ export type GoogleEvent = {
   calendarId: string; // which Google calendar it came from (for filtering)
   calendar: string; // that calendar's display name
   color: string | null;
+  mergeSsm: boolean; // fold into the "Seaside Media" chip with the app's tasks
   dayIso: string;
   allDay: boolean;
   startMin?: number;
@@ -191,7 +192,7 @@ export async function syncGoogleEvents(
 
   const { data: calendars } = await supabase
     .from('google_calendars')
-    .select('id, summary, color')
+    .select('id, summary, color, merge_ssm')
     .eq('included', true)
     .limit(15);
   if (!calendars || calendars.length === 0) return { status: 'ok', events: [] };
@@ -213,7 +214,7 @@ export async function syncGoogleEvents(
         const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
         if (!res.ok) return [];
         const json = (await res.json()) as { items?: RawEvent[] };
-        return (json.items ?? []).flatMap((ev) => normalize(ev, cal.id, cal.summary, cal.color ?? null, firstIso, lastIso));
+        return (json.items ?? []).flatMap((ev) => normalize(ev, cal, firstIso, lastIso));
       }),
     );
     return { status: 'ok', events: perCalendar.flat() };
@@ -225,15 +226,21 @@ export async function syncGoogleEvents(
 // Expand one raw Google event into per-day calendar entries within the range.
 function normalize(
   ev: RawEvent,
-  calendarId: string,
-  calendar: string,
-  color: string | null,
+  cal: { id: string; summary: string; color: string | null; merge_ssm: boolean },
   firstIso: string,
   lastIso: string,
 ): GoogleEvent[] {
   if (!ev.id || ev.status === 'cancelled') return [];
   const title = ev.summary?.trim() || '(untitled)';
-  const base = { id: ev.id, title, calendarId, calendar, color, htmlLink: ev.htmlLink };
+  const base = {
+    id: ev.id,
+    title,
+    calendarId: cal.id,
+    calendar: cal.summary,
+    color: cal.color,
+    mergeSsm: cal.merge_ssm,
+    htmlLink: ev.htmlLink,
+  };
 
   // All-day: start.date is inclusive, end.date is EXCLUSIVE — one entry per day.
   if (ev.start?.date) {

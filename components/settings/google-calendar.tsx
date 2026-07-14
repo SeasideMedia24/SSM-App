@@ -5,7 +5,7 @@
 // only sees the connection status and the calendar list.
 
 import { useState, useTransition } from 'react';
-import { setCalendarIncluded, disconnectGoogle } from '@/app/(app)/settings/google-actions';
+import { setCalendarIncluded, setCalendarMergeSsm, disconnectGoogle } from '@/app/(app)/settings/google-actions';
 
 export type GoogleCalendarRow = {
   id: string;
@@ -13,6 +13,7 @@ export type GoogleCalendarRow = {
   color: string | null;
   is_primary: boolean;
   included: boolean;
+  merge_ssm: boolean;
 };
 
 export function GoogleCalendarSettings({
@@ -116,8 +117,12 @@ export function GoogleCalendarSettings({
           </div>
 
           <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">
               Calendars on the dashboard
+            </p>
+            <p className="mb-2 text-xs text-slate-400">
+              Tick a calendar to show it. Mark one “＝ Seaside Media” to fold its events in with your
+              app tasks under a single Seaside Media chip.
             </p>
             {calendars.length === 0 ? (
               <p className="text-sm text-slate-400">
@@ -126,7 +131,7 @@ export function GoogleCalendarSettings({
             ) : (
               <ul className="space-y-1.5">
                 {calendars.map((cal) => (
-                  <li key={cal.id}>
+                  <li key={cal.id} className="flex flex-wrap items-center justify-between gap-2">
                     <label className="flex cursor-pointer items-center gap-2.5 text-sm text-slate-700">
                       <input
                         type="checkbox"
@@ -144,6 +149,19 @@ export function GoogleCalendarSettings({
                       />
                       {cal.summary || cal.id}
                       {cal.is_primary && <span className="text-[11px] text-slate-400">(main)</span>}
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-1.5 text-xs text-slate-500">
+                      <input
+                        type="checkbox"
+                        defaultChecked={cal.merge_ssm}
+                        disabled={pending}
+                        onChange={(e) => {
+                          const merge = e.target.checked;
+                          start(() => setCalendarMergeSsm(cal.id, merge));
+                        }}
+                        className="h-3.5 w-3.5 accent-teal"
+                      />
+                      ＝ Seaside Media
                     </label>
                   </li>
                 ))}

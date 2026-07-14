@@ -16,10 +16,11 @@ type NavItem = { href: string; label: string; icon: React.ReactNode; children?: 
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: <IconGrid /> },
   {
-    href: '/clients',
+    href: '/people',
     label: 'People',
     icon: <IconUsers />,
     children: [
+      { href: '/people', label: 'Overview' },
       { href: '/clients', label: 'Clients' },
       { href: '/inquiries', label: 'Inquiries' },
       { href: '/contractors', label: 'Team' },

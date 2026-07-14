@@ -17,7 +17,7 @@ export default async function SettingsPage({
     supabase.from('pricing_page_services').select('*').order('sort'),
     supabase.from('pricing_config').select('*'),
     supabase.from('google_accounts').select('email').maybeSingle(),
-    supabase.from('google_calendars').select('id, summary, color, is_primary, included').order('summary'),
+    supabase.from('google_calendars').select('id, summary, color, is_primary, included, merge_ssm').order('summary'),
   ]);
   const config = Object.fromEntries((configRows ?? []).map((c) => [c.key, c.value]));
   const ratesMissing = !roles || roles.length === 0;
