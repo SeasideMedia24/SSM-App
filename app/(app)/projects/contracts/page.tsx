@@ -32,10 +32,9 @@ export default async function AllContractsPage() {
           {rows.map((c) => {
             const p = proj(c.projects as ProjRel);
             const meta = contractStatusMeta(c.status);
-            // The whole row opens the contract inside its project (falls back to
-            // the project page if somehow unlinked).
+            // The whole row opens the contract editor / signing document.
             return (
-              <RowLink key={c.id} href={p ? `/projects/${p.id}?view=contracts` : '#'}>
+              <RowLink key={c.id} href={`/contracts/${c.id}`}>
                 <td className="px-4 py-3 font-medium text-ink">{c.title}</td>
                 <td className="px-4 py-3 text-slate-600">{p?.title ?? '—'}</td>
                 <td className="px-4 py-3"><span className={`rounded-md px-2 py-0.5 text-xs font-medium ${meta.pill}`}>{meta.label}</span></td>

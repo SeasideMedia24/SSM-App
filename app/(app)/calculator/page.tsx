@@ -7,6 +7,7 @@ import { Collapsible } from '@/components/ui/collapsible';
 import { QuoteStatusSelect } from '@/components/calculator/quote-status-select';
 import { ShareQuoteControl } from '@/components/calculator/share-quote-control';
 import { createInvoiceFromQuote } from '@/app/(app)/invoices/actions';
+import { createContractFromQuote } from '@/app/(app)/contracts/actions';
 import { money } from '@/lib/projects/format';
 import type { CalculatorSelections } from '@/lib/pricing/engine';
 import type { QuoteStatus } from '@/types/database.types';
@@ -18,9 +19,9 @@ import type { QuoteStatus } from '@/types/database.types';
 export default async function CalculatorPage({
   searchParams,
 }: {
-  searchParams: Promise<{ quote?: string; saved?: string }>;
+  searchParams: Promise<{ quote?: string; saved?: string; contract_error?: string }>;
 }) {
-  const { quote: editId, saved } = await searchParams;
+  const { quote: editId, saved, contract_error: contractError } = await searchParams;
   const supabase = await createClient();
 
   const [
@@ -86,6 +87,10 @@ export default async function CalculatorPage({
           <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
             Quote saved ✓ — it’s in the list below, and on its project’s budget if you linked one.
           </p>
+        )}
+
+        {contractError && (
+          <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">{contractError}</p>
         )}
 
         {initial && (
@@ -198,6 +203,12 @@ function QuotesTable({ rows }: { rows: QuoteRow[] }) {
                       <input type="hidden" name="quote_id" value={q.id} />
                       <button type="submit" className="text-xs font-medium text-sea hover:underline">
                         Create invoice
+                      </button>
+                    </form>
+                    <form action={createContractFromQuote}>
+                      <input type="hidden" name="quote_id" value={q.id} />
+                      <button type="submit" className="text-xs font-medium text-sea hover:underline">
+                        Generate contract
                       </button>
                     </form>
                     <ShareQuoteControl quoteId={q.id} token={q.share_token} />
