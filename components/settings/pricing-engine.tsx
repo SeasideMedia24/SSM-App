@@ -64,7 +64,7 @@ function RoleRow({ role, onDone }: { role?: RoleRates; onDone?: () => void }) {
 
   return (
     <form action={action} className="flex flex-col gap-1">
-      <div className="grid grid-cols-[1fr_5.5rem_5.5rem_5.5rem_3.5rem_auto_auto] items-center gap-2">
+      <div className="grid grid-cols-[12rem_5.5rem_5.5rem_5.5rem_3.5rem_auto_auto] items-center gap-2 px-1">
         {role && <input type="hidden" name="id" value={role.id} />}
         <input name="name" defaultValue={role?.name ?? ''} placeholder="e.g. Steadicam Op" required className={field} />
         <input name="day_rate" type="number" min="0" step="0.01" defaultValue={role ? String(role.day_rate) : ''} placeholder="day" required className={field} disabled={role?.kind === 'drone'} />
@@ -91,7 +91,9 @@ function RoleRow({ role, onDone }: { role?: RoleRates; onDone?: () => void }) {
 
 // ---- Page services --------------------------------------------------------------
 
-function ServiceRow({ svc, onDone }: { svc?: PageService; onDone?: () => void }) {
+// A service belongs to exactly one phase, decided by which section it lives in
+// (Pre / Post) — so the phase rides along as a hidden field, no dropdown.
+function ServiceRow({ svc, phase, onDone }: { svc?: PageService; phase: 'pre' | 'post'; onDone?: () => void }) {
   const [state, action] = useActionState<PricingFormState, FormData>(
     async (prev, fd) => {
       const result = await savePricingService(prev, fd);
@@ -103,13 +105,10 @@ function ServiceRow({ svc, onDone }: { svc?: PageService; onDone?: () => void })
 
   return (
     <form action={action} className="flex flex-col gap-1">
-      <div className="grid grid-cols-[1fr_7rem_7rem_auto_auto] items-center gap-2">
+      <div className="grid grid-cols-[1fr_7rem_auto_auto] items-center gap-2 px-1">
         {svc && <input type="hidden" name="id" value={svc.id} />}
+        <input type="hidden" name="phase" value={phase} />
         <input name="name" defaultValue={svc?.name ?? ''} placeholder="e.g. Motion graphics" required className={field} />
-        <select name="phase" defaultValue={svc?.phase ?? 'post'} className={field}>
-          <option value="pre">Pre-production</option>
-          <option value="post">Post-production</option>
-        </select>
         <input name="page_rate" type="number" min="0" step="0.01" defaultValue={svc ? String(svc.page_rate) : ''} placeholder="$/page-min" required className={field} />
         <SaveButton label={svc ? 'Save' : 'Add'} />
         {svc ? <DeleteControl deleteAction={deletePricingService} /> : (
@@ -132,9 +131,6 @@ const CONFIG_FIELDS: { key: string; label: string; suffix?: string }[] = [
   { key: 'rental_high', label: 'Rental — High', suffix: '$' },
   { key: 'about_us_fee', label: '“About Us” fee', suffix: '$' },
   { key: 'short_rate', label: 'Per short (incl. editing)', suffix: '$' },
-  { key: 'actor_high', label: 'Actor — A-tier (per day)', suffix: '$' },
-  { key: 'actor_medium', label: 'Actor — B-tier (per day)', suffix: '$' },
-  { key: 'actor_low', label: 'Actor — C-tier (per day)', suffix: '$' },
   { key: 'permit', label: 'Permit (each)', suffix: '$' },
   { key: 'discount_referral', label: 'Referral discount', suffix: '%' },
   { key: 'discount_first_time', label: 'First Time discount', suffix: '%' },
@@ -164,11 +160,40 @@ function ConfigForm({ config }: { config: PricingConfig }) {
   );
 }
 
+// One phase's services (Pre or Post) as its own card. Which section a service
+// lives in IS its phase — there's no phase dropdown; adding here files it here.
+function PhaseServices({ title, phase, services }: { title: string; phase: 'pre' | 'post'; services: PageService[] }) {
+  const [adding, setAdding] = useState(false);
+  const list = services.filter((s) => s.phase === phase);
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+      <p className="mb-4 mt-0.5 text-xs text-slate-400">
+        Billed per page-minute of the project, before markup.
+      </p>
+      <div className="flex flex-col gap-2">
+        {list.map((s) => <ServiceRow key={`${s.id}-${s.page_rate}`} svc={s} phase={phase} />)}
+        {list.length === 0 && !adding && (
+          <p className="px-1 text-xs text-slate-400">Nothing here yet — add the first below.</p>
+        )}
+        {adding ? (
+          <ServiceRow phase={phase} onDone={() => setAdding(false)} />
+        ) : (
+          <div>
+            <button type="button" onClick={() => setAdding(true)} className="mt-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-teal hover:text-sea">
+              + Add service
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ---- The whole section ----------------------------------------------------------
 
 export function PricingEngine({ roles, services, config }: { roles: RoleRates[]; services: PageService[]; config: PricingConfig }) {
   const [addingRole, setAddingRole] = useState(false);
-  const [addingService, setAddingService] = useState(false);
 
   return (
     <div className="flex flex-col gap-6">
@@ -177,7 +202,7 @@ export function PricingEngine({ roles, services, config }: { roles: RoleRates[];
         <p className="mb-4 mt-0.5 text-xs text-slate-400">
           Per person, before the markup. Changing a rate affects new quotes only.
         </p>
-        <div className="mb-1.5 grid grid-cols-[1fr_5.5rem_5.5rem_5.5rem_3.5rem_auto_auto] gap-2 px-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+        <div className="mb-1.5 grid grid-cols-[12rem_5.5rem_5.5rem_5.5rem_3.5rem_auto_auto] gap-2 px-1 text-xs font-medium uppercase tracking-wide text-slate-500">
           <span>Role</span><span>Day</span><span>Half</span><span>Hour</span><span className="text-center">Qty</span><span /><span />
         </div>
         <div className="flex flex-col gap-2">
@@ -194,24 +219,8 @@ export function PricingEngine({ roles, services, config }: { roles: RoleRates[];
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h3 className="text-sm font-semibold text-slate-900">Pre / Post services</h3>
-        <p className="mb-4 mt-0.5 text-xs text-slate-400">
-          Billed per page-minute of the project, before markup.
-        </p>
-        <div className="flex flex-col gap-2">
-          {services.map((s) => <ServiceRow key={`${s.id}-${s.page_rate}-${s.phase}`} svc={s} />)}
-          {addingService ? (
-            <ServiceRow onDone={() => setAddingService(false)} />
-          ) : (
-            <div>
-              <button type="button" onClick={() => setAddingService(true)} className="mt-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-teal hover:text-sea">
-                + Add service
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+      <PhaseServices title="Pre-production services" phase="pre" services={services} />
+      <PhaseServices title="Post-production services" phase="post" services={services} />
 
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h3 className="text-sm font-semibold text-slate-900">The numbers</h3>
