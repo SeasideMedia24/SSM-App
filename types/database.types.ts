@@ -703,6 +703,21 @@ export type Database = {
           notes: string | null;
           position: number;
           created_at: string;
+          share_token: string | null;
+          quote_id: string | null;
+          effective_date: string | null;
+          deposit_amount: number | null;
+          production_amount: number | null;
+          delivery_amount: number | null;
+          revision_rounds: number;
+          revision_pct: number;
+          body_md: string | null;
+          deliverables_snapshot: Json | null;
+          signer_name: string | null;
+          signer_title: string | null;
+          signed_at: string | null;
+          signer_ip: string | null;
+          deposit_invoice_id: string | null;
         };
         Insert: {
           id?: string;
@@ -715,6 +730,21 @@ export type Database = {
           notes?: string | null;
           position?: number;
           created_at?: string;
+          share_token?: string | null;
+          quote_id?: string | null;
+          effective_date?: string | null;
+          deposit_amount?: number | null;
+          production_amount?: number | null;
+          delivery_amount?: number | null;
+          revision_rounds?: number;
+          revision_pct?: number;
+          body_md?: string | null;
+          deliverables_snapshot?: Json | null;
+          signer_name?: string | null;
+          signer_title?: string | null;
+          signed_at?: string | null;
+          signer_ip?: string | null;
+          deposit_invoice_id?: string | null;
         };
         Update: {
           id?: string;
@@ -727,6 +757,21 @@ export type Database = {
           notes?: string | null;
           position?: number;
           created_at?: string;
+          share_token?: string | null;
+          quote_id?: string | null;
+          effective_date?: string | null;
+          deposit_amount?: number | null;
+          production_amount?: number | null;
+          delivery_amount?: number | null;
+          revision_rounds?: number;
+          revision_pct?: number;
+          body_md?: string | null;
+          deliverables_snapshot?: Json | null;
+          signer_name?: string | null;
+          signer_title?: string | null;
+          signed_at?: string | null;
+          signer_ip?: string | null;
+          deposit_invoice_id?: string | null;
         };
         Relationships: [
           {
