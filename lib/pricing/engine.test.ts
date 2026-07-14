@@ -48,35 +48,31 @@ describe('computeCost', () => {
   });
 });
 
-describe('actors & permits', () => {
-  const cfg: PricingConfig = { markup: 2.5, actor_high: 500, actor_medium: 300, actor_low: 150, permit: 200 };
+describe('permits', () => {
+  const cfg: PricingConfig = { markup: 2.5, permit: 200 };
 
-  it('bills actors like crew (marked up) and permits at cost (pass-through)', () => {
-    const s = { ...emptySelections(), actors: { high: 1, medium: 2, low: 0 }, permits: 3 };
+  it('bills permits at cost (pass-through, no markup)', () => {
+    const s = { ...emptySelections(), permits: 3 };
     const q = computeQuote(s, roles, services, cfg);
-    // Actors cost = 500 + 2×300 = 1100 → charge 1100×2.5 = 2750 (in production).
-    // Permits cost = 3×200 = 600, pass-through (no markup).
-    expect(q.production).toBe(2750);
-    expect(q.overall).toBe(2750 + 600);
+    // Permits cost = 3×200 = 600, pass-through (no markup, no production).
+    expect(q.production).toBe(0);
+    expect(q.overall).toBe(600);
   });
 
-  it('reports actors + permits at cost, and margin is only the actor markup', () => {
-    const s = { ...emptySelections(), actors: { high: 1, medium: 2, low: 0 }, permits: 3 };
+  it('folds permits into the pass-through (travel) cost with no margin', () => {
+    const s = { ...emptySelections(), permits: 3 };
     const cost = computeCost(s, roles, services, cfg);
-    expect(cost.crew).toBe(1100); // actors fold into crew cost
     expect(cost.travel).toBe(600); // permits fold into pass-through
-    expect(cost.total).toBe(1700);
+    expect(cost.total).toBe(600);
     const q = computeQuote(s, roles, services, cfg);
-    // margin = charge − cost = (2750+600) − 1700 = 1650 = markup on 1100 actors only.
-    expect(q.overall - cost.total).toBe(1650);
+    expect(q.overall - cost.total).toBe(0); // pass-through adds no margin
   });
 
-  it('itemises actor and permit cost lines', () => {
-    const s = { ...emptySelections(), actors: { high: 1, medium: 0, low: 0 }, permits: 2 };
+  it('itemises the permit cost line', () => {
+    const s = { ...emptySelections(), permits: 2 };
     const { lines, total } = computeCostLines(s, roles, services, cfg);
     const labels = lines.map((l) => l.label);
-    expect(labels.some((l) => l.includes('A-tier') && l.includes('×1'))).toBe(true);
     expect(labels.some((l) => l.startsWith('Permits ×2'))).toBe(true);
-    expect(total).toBe(500 + 400); // 1 A-tier @500 + 2 permits @200
+    expect(total).toBe(400); // 2 permits @200
   });
 });

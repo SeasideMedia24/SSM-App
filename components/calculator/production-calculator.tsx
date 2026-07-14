@@ -11,9 +11,9 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { saveQuote, quickCreateClient, type QuoteFormState } from '@/app/(app)/calculator/actions';
 import {
-  computeQuote, emptySelections, RENTAL_LABELS, DISCOUNT_LABELS, ACTOR_TIERS,
+  computeQuote, emptySelections, RENTAL_LABELS, DISCOUNT_LABELS,
   type CalculatorSelections, type RoleRates, type PageService, type PricingConfig,
-  type RentalTier, type DiscountKey, type PhotographerBooking, type ActorTier,
+  type RentalTier, type DiscountKey, type PhotographerBooking,
 } from '@/lib/pricing/engine';
 import { money } from '@/lib/projects/format';
 
@@ -129,19 +129,6 @@ export function ProductionCalculator({
   }
   function setRole(id: string, patch: { quantity?: number; booking?: PhotographerBooking }) {
     setS((prev) => ({ ...prev, roles: { ...prev.roles, [id]: { ...prev.roles[id], ...patch } } }));
-  }
-  // Actor count per tier — rebuilt whole each time so quotes saved before the
-  // actors field existed (prev.actors undefined) get a complete object.
-  function setActor(tier: ActorTier, value: number) {
-    setS((prev) => ({
-      ...prev,
-      actors: {
-        high: prev.actors?.high ?? 0,
-        medium: prev.actors?.medium ?? 0,
-        low: prev.actors?.low ?? 0,
-        [tier]: value,
-      },
-    }));
   }
   function toggleService(id: string) {
     setS((prev) => ({
@@ -275,41 +262,6 @@ export function ProductionCalculator({
                 {t.label}{t.value !== 'none' && <span className="ml-1.5 text-xs text-slate-400">{money(t.price)}</span>}
               </button>
             ))}
-          </div>
-        </Card>
-
-        {/* Actors / Models — checkbox per tier (with a count when checked) */}
-        <Card
-          title="Actors / Models"
-          hint="Billed like crew (marked up). Set the tier rates in Settings → Edit rates."
-          onReset={() => set({ actors: { high: 0, medium: 0, low: 0 } })}
-        >
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            {ACTOR_TIERS.map(({ key, label }) => {
-              const count = s.actors?.[key] ?? 0;
-              const checked = count > 0;
-              return (
-                <div
-                  key={key}
-                  className={`flex items-center gap-3 rounded-xl border px-3 py-2 transition-colors ${checked ? 'border-teal/50 bg-teal/5' : 'border-slate-200'}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => setActor(key, checked ? 0 : 1)}
-                    className="h-4 w-4 accent-teal"
-                    aria-label={`${label} actor`}
-                  />
-                  <span className="text-sm text-slate-800">{label}</span>
-                  <span className="text-xs text-slate-400">{money(config[`actor_${key}`] ?? 0)}/day</span>
-                  {checked && (
-                    <span className="ml-auto">
-                      <Stepper value={count} onChange={(v) => setActor(key, v)} label={`${label} actors`} />
-                    </span>
-                  )}
-                </div>
-              );
-            })}
           </div>
         </Card>
 
