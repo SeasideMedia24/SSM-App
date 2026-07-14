@@ -87,7 +87,20 @@ export async function setTaskStatus(taskId: string, projectId: string, status: T
   if (!TASK_STATUS_VALUES.includes(status)) return;
   const supabase = await createSupabaseServer();
   await supabase.from('tasks').update({ status }).eq('id', taskId);
-  revalidatePath(`/projects/${projectId}`);
+  // My Tasks tasks may have no project — only revalidate a real project path.
+  if (projectId) revalidatePath(`/projects/${projectId}`);
+  revalidatePath('/my-tasks');
+}
+
+// Soft-archive (hide from the default My Tasks view) or restore a task. archived_at
+// is the timestamp when archived, null when live. Reversible — not a delete.
+export async function setTaskArchived(taskId: string, archived: boolean) {
+  if (typeof taskId !== 'string' || taskId.length === 0) return;
+  const supabase = await createSupabaseServer();
+  await supabase
+    .from('tasks')
+    .update({ archived_at: archived ? new Date().toISOString() : null })
+    .eq('id', taskId);
   revalidatePath('/my-tasks');
 }
 

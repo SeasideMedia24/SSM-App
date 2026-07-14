@@ -157,6 +157,7 @@ export type Database = {
           priority: TaskPriority;
           due_date: string | null;
           worker_note: string | null;
+          archived_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -170,6 +171,7 @@ export type Database = {
           priority?: TaskPriority;
           due_date?: string | null;
           worker_note?: string | null;
+          archived_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -183,6 +185,7 @@ export type Database = {
           priority?: TaskPriority;
           due_date?: string | null;
           worker_note?: string | null;
+          archived_at?: string | null;
           created_at?: string;
         };
         Relationships: [
