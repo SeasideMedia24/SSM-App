@@ -70,3 +70,57 @@ export async function createInvoiceFromQuoteId(
 
   return invoice;
 }
+
+// Create a single-line DRAFT invoice for a fixed amount — used for the deposit
+// invoice generated when a client signs a contract. Same invoice-number scheme
+// and cleanup-on-failure behaviour as createInvoiceFromQuoteId. Due immediately
+// (deposit is payable on signature) unless a due date is passed.
+export async function createDepositInvoice(
+  supabase: DB,
+  opts: {
+    clientId: string;
+    projectId: string | null;
+    quoteId: string | null;
+    label: string;
+    amount: number;
+    dueDate?: string;
+  },
+): Promise<{ id: string; title: string; total: number }> {
+  const { count } = await supabase.from('invoices').select('id', { count: 'exact', head: true });
+  const invoiceNumber = `INV-${String((count ?? 0) + 1).padStart(4, '0')}`;
+
+  const now = new Date();
+  const { data: invoice, error } = await supabase
+    .from('invoices')
+    .insert({
+      client_id: opts.clientId,
+      project_id: opts.projectId,
+      quote_id: opts.quoteId,
+      invoice_number: invoiceNumber,
+      title: opts.label,
+      status: 'draft',
+      subtotal: opts.amount,
+      total: opts.amount,
+      issue_date: iso(now),
+      due_date: opts.dueDate ?? iso(now),
+    })
+    .select('id, title, total')
+    .single();
+  if (error || !invoice) throw new Error(error?.message ?? 'Could not create the deposit invoice.');
+
+  const { error: liErr } = await supabase.from('invoice_line_items').insert({
+    invoice_id: invoice.id,
+    label: opts.label,
+    quantity: 1,
+    unit: null,
+    rate: opts.amount,
+    amount: opts.amount,
+    position: 0,
+  });
+  if (liErr) {
+    await supabase.from('invoices').delete().eq('id', invoice.id);
+    throw new Error(liErr.message);
+  }
+
+  return invoice;
+}
