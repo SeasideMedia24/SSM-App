@@ -10,7 +10,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createClient as createSupabaseServer } from '@/lib/supabase/server';
 import { buildContractFromQuote } from '@/lib/contracts/create';
-import { renderContract, type ContractTerms } from '@/lib/contracts/template';
+import { renderContract, normalizeDeliverables, type ContractTerms, type Deliverable } from '@/lib/contracts/template';
 import { contractReadiness } from '@/lib/contracts/validate';
 
 const MIGRATION_HINT =
@@ -64,10 +64,13 @@ export async function updateContractTerms(_prev: ContractFormState, f: FormData)
   const revision_rounds = num(f.get('revision_rounds')) ?? 0;
   const revision_pct = num(f.get('revision_pct')) ?? 0;
 
-  const deliverables = String(f.get('deliverables') ?? '')
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean);
+  // Deliverables arrive as JSON: [{ title, due }]. Normalize + drop blanks.
+  let deliverables: Deliverable[];
+  try {
+    deliverables = normalizeDeliverables(JSON.parse(String(f.get('deliverables_json') ?? '[]')));
+  } catch {
+    deliverables = [];
+  }
 
   for (const [label, v] of [['Deposit', deposit_amount], ['After production', production_amount], ['After delivery', delivery_amount]] as const) {
     if (v !== null && v < 0) return { ok: false, error: `${label} amount can’t be negative.` };
@@ -113,7 +116,7 @@ export async function sendContractForSignature(contractId: string): Promise<Send
 
   const project = c.projects as unknown as { title: string; clients: { name: string; company: string | null } | null } | null;
   const client = project?.clients ?? null;
-  const deliverables = Array.isArray(c.deliverables_snapshot) ? (c.deliverables_snapshot as string[]) : [];
+  const deliverables = normalizeDeliverables(c.deliverables_snapshot);
 
   const missing = contractReadiness({
     clientName: client?.name,

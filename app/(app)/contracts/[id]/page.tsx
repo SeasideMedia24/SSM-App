@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/page-header';
 import { ContractEditor } from '@/components/contracts/contract-editor';
 import { DeleteContractButton } from '@/components/contracts/delete-contract-button';
 import { contractStatusMeta } from '@/lib/projects/status';
+import { normalizeDeliverables } from '@/lib/contracts/template';
 import type { ContractStatus } from '@/types/database.types';
 
 type Rel<T> = T | T[] | null;
@@ -54,7 +55,7 @@ export default async function ContractEditorPage({ params }: { params: Promise<{
           delivery_amount: c.delivery_amount,
           revision_rounds: c.revision_rounds,
           revision_pct: c.revision_pct,
-          deliverables_snapshot: Array.isArray(c.deliverables_snapshot) ? (c.deliverables_snapshot as string[]) : [],
+          deliverables_snapshot: normalizeDeliverables(c.deliverables_snapshot),
           share_token: c.share_token,
           body_md: c.body_md,
           signer_name: c.signer_name,

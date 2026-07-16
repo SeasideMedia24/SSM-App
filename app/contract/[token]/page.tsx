@@ -7,6 +7,7 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { normalizeDeliverables } from '@/lib/contracts/template';
 import { SignForm } from './sign-form';
 import { WelcomePacket } from '@/components/contracts/welcome-packet';
 
@@ -58,7 +59,7 @@ export default async function SharedContractPage({ params }: { params: Promise<{
   const project = one(contract.projects as ProjRel) as { title: string; clients: unknown } | null;
   const projectTitle = project?.title ?? 'Your project';
   const signed = contract.status === 'signed';
-  const deliverables = Array.isArray(contract.deliverables_snapshot) ? (contract.deliverables_snapshot as string[]) : [];
+  const deliverables = normalizeDeliverables(contract.deliverables_snapshot);
 
   // For the welcome packet's "pay deposit" CTA, resolve the invoice's public link.
   let depositInvoiceUrl: string | null = null;

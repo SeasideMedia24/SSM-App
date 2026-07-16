@@ -10,6 +10,9 @@
 // To change the contract wording, edit the clause text below. To change which
 // values get filled in, edit ContractTerms + the merge points.
 
+// A deliverable line on the contract: what's being made, and when it's due.
+export type Deliverable = { title: string; due: string | null };
+
 export type ContractTerms = {
   clientName: string;
   clientCompany?: string | null;
@@ -18,10 +21,22 @@ export type ContractTerms = {
   depositAmount: number;
   productionAmount: number;
   deliveryAmount: number;
-  deliverables: string[];
+  deliverables: Deliverable[];
   revisionRounds: number;
   revisionPct: number;
 };
+
+// Deliverables are stored as jsonb and may include older string-only rows —
+// normalize both shapes to { title, due } and drop blanks.
+export function normalizeDeliverables(raw: unknown): Deliverable[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((d): Deliverable =>
+      typeof d === 'string'
+        ? { title: d.trim(), due: null }
+        : { title: String((d as { title?: unknown })?.title ?? '').trim(), due: ((d as { due?: unknown })?.due as string | null) ?? null })
+    .filter((d) => d.title !== '');
+}
 
 const usd = (n: number) =>
   n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 });
@@ -33,7 +48,7 @@ export function renderContract(t: ContractTerms): string {
   const client = t.clientCompany ? `${t.clientName} (${t.clientCompany})` : t.clientName;
   const deliverables =
     t.deliverables.length > 0
-      ? t.deliverables.map((d, i) => `${i + 1}. ${d}`).join('\n')
+      ? t.deliverables.map((d, i) => `${i + 1}. ${d.title}${d.due ? ` — _due ${longDate(d.due)}_` : ''}`).join('\n')
       : '_(deliverables to be listed)_';
 
   return `# CONTRACT PROJECT AGREEMENT

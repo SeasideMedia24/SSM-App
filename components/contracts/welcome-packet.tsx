@@ -2,12 +2,13 @@
 // future client portal). Three things, per the owner's SOP: project scope,
 // payment terms, and a milestone timeline — plus a CTA to pay the deposit.
 
-import { money } from '@/lib/projects/format';
+import { money, fmtDate } from '@/lib/projects/format';
+import type { Deliverable } from '@/lib/contracts/template';
 
 export type WelcomePacketProps = {
   signerName: string | null;
   projectTitle: string;
-  deliverables: string[];
+  deliverables: Deliverable[];
   depositAmount: number;
   productionAmount: number;
   deliveryAmount: number;
@@ -55,7 +56,8 @@ export function WelcomePacket(p: WelcomePacketProps) {
               {p.deliverables.map((d, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
                   <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-teal" />
-                  {d}
+                  <span className="flex-1">{d.title}</span>
+                  {d.due && <span className="whitespace-nowrap text-xs text-slate-400">due {fmtDate(d.due)}</span>}
                 </li>
               ))}
             </ul>

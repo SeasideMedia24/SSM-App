@@ -9,7 +9,7 @@
 import { useMemo, useState, useTransition } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { renderContract, type ContractTerms } from '@/lib/contracts/template';
+import { renderContract, type ContractTerms, type Deliverable } from '@/lib/contracts/template';
 import { contractReadiness } from '@/lib/contracts/validate';
 import {
   updateContractTerms, sendContractForSignature, revokeContractLink,
@@ -32,7 +32,7 @@ export type ContractEditorData = {
   delivery_amount: number | null;
   revision_rounds: number;
   revision_pct: number;
-  deliverables_snapshot: string[];
+  deliverables_snapshot: Deliverable[];
   share_token: string | null;
   body_md: string | null;
   signer_name: string | null;
@@ -70,7 +70,13 @@ export function ContractEditor({
   const [delivery, setDelivery] = useState(contract.delivery_amount?.toString() ?? '');
   const [rounds, setRounds] = useState(contract.revision_rounds?.toString() ?? '2');
   const [pct, setPct] = useState(contract.revision_pct?.toString() ?? '100');
-  const [deliverablesText, setDeliverablesText] = useState((contract.deliverables_snapshot ?? []).join('\n'));
+  const [deliverables, setDeliverables] = useState<Deliverable[]>(
+    contract.deliverables_snapshot.length > 0 ? contract.deliverables_snapshot : [{ title: '', due: null }],
+  );
+  const setDeliverable = (i: number, patch: Partial<Deliverable>) =>
+    setDeliverables((prev) => prev.map((d, j) => (j === i ? { ...d, ...patch } : d)));
+  const addDeliverable = () => setDeliverables((prev) => [...prev, { title: '', due: null }]);
+  const removeDeliverable = (i: number) => setDeliverables((prev) => prev.filter((_, j) => j !== i));
 
   const [saveState, setSaveState] = useState<ContractFormState>({ ok: false, error: null });
   const [savedTick, setSavedTick] = useState(false);
@@ -86,21 +92,22 @@ export function ContractEditor({
     const n = Number(t);
     return Number.isFinite(n) ? n : null;
   };
-  const deliverables = deliverablesText.split('\n').map((l) => l.trim()).filter(Boolean);
+  // Only deliverables with a title count / render.
+  const cleanDeliverables = deliverables.map((d) => ({ title: d.title.trim(), due: d.due || null })).filter((d) => d.title !== '');
 
   const readiness = contractReadiness({
     clientName, projectName: projectTitle, effectiveDate: effectiveDate || null,
     depositAmount: num(deposit), productionAmount: num(production), deliveryAmount: num(delivery),
-    revisionRounds: num(rounds), revisionPct: num(pct), deliverablesCount: deliverables.length,
+    revisionRounds: num(rounds), revisionPct: num(pct), deliverablesCount: cleanDeliverables.length,
   });
 
   const preview: ContractTerms = useMemo(() => ({
     clientName, clientCompany, projectName: projectTitle,
     effectiveDate: effectiveDate || null,
     depositAmount: num(deposit) ?? 0, productionAmount: num(production) ?? 0, deliveryAmount: num(delivery) ?? 0,
-    deliverables, revisionRounds: num(rounds) ?? 0, revisionPct: num(pct) ?? 0,
+    deliverables: cleanDeliverables, revisionRounds: num(rounds) ?? 0, revisionPct: num(pct) ?? 0,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [clientName, clientCompany, projectTitle, effectiveDate, deposit, production, delivery, deliverablesText, rounds, pct]);
+  }), [clientName, clientCompany, projectTitle, effectiveDate, deposit, production, delivery, deliverables, rounds, pct]);
 
   const previewMd = signed && contract.body_md ? contract.body_md : renderContract(preview);
 
@@ -114,7 +121,7 @@ export function ContractEditor({
     fd.set('delivery_amount', delivery);
     fd.set('revision_rounds', rounds);
     fd.set('revision_pct', pct);
-    fd.set('deliverables', deliverablesText);
+    fd.set('deliverables_json', JSON.stringify(cleanDeliverables));
     return fd;
   }
 
@@ -192,13 +199,43 @@ export function ContractEditor({
             </label>
           </div>
 
-          <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
-            Deliverables <span className="font-normal text-slate-400">(one per line)</span>
-            <textarea
-              rows={4} value={deliverablesText} onChange={(e) => setDeliverablesText(e.target.value)}
-              placeholder={'e.g. 60-second brand film\ne.g. 3 × 15s social cutdowns'} className={`${field} resize-y`}
-            />
-          </label>
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-medium text-slate-500">
+              Deliverables <span className="font-normal text-slate-400">(what, and when it’s due)</span>
+            </span>
+            {deliverables.map((d, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <input
+                  value={d.title}
+                  onChange={(e) => setDeliverable(i, { title: e.target.value })}
+                  placeholder="e.g. 60-second brand film"
+                  className={`${field} flex-1`}
+                />
+                <input
+                  type="date"
+                  value={d.due ?? ''}
+                  onChange={(e) => setDeliverable(i, { due: e.target.value || null })}
+                  aria-label="Due date"
+                  className={`${field} w-[8.5rem]`}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeDeliverable(i)}
+                  aria-label="Remove deliverable"
+                  className="mt-1.5 px-1 text-slate-400 hover:text-red-600"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addDeliverable}
+              className="self-start text-xs font-medium text-sea hover:underline"
+            >
+              + Add deliverable
+            </button>
+          </div>
         </fieldset>
 
         {!signed && (

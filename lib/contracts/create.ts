@@ -30,7 +30,7 @@ export async function buildContractFromQuote(
   // owner edits this snapshot in the editor; it's independent of the live table.
   const { data: deliverables } = await supabase
     .from('deliverables')
-    .select('title')
+    .select('title, due_date')
     .eq('project_id', quote.project_id)
     .order('position');
 
@@ -52,7 +52,7 @@ export async function buildContractFromQuote(
       delivery_amount: delivery,
       revision_rounds: 2,
       revision_pct: 100,
-      deliverables_snapshot: (deliverables ?? []).map((d) => d.title),
+      deliverables_snapshot: (deliverables ?? []).map((d) => ({ title: d.title, due: d.due_date })),
     })
     .select('id, project_id')
     .single();
