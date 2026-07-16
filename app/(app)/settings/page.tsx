@@ -3,21 +3,24 @@ import { PageHeader, ComingSoon } from '@/components/page-header';
 import { PublicOnboardLink } from '@/components/settings/public-onboard-link';
 import { PricingEngine } from '@/components/settings/pricing-engine';
 import { GoogleCalendarSettings, type GoogleCalendarRow } from '@/components/settings/google-calendar';
+import { QuickbooksSettings } from '@/components/settings/quickbooks';
 import { googleConfigured } from '@/lib/google/calendar';
+import { quickbooksConfigured } from '@/lib/quickbooks/config';
 
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ google?: string }>;
+  searchParams: Promise<{ google?: string; quickbooks?: string }>;
 }) {
-  const { google: googleFlag } = await searchParams;
+  const { google: googleFlag, quickbooks: quickbooksFlag } = await searchParams;
   const supabase = await createClient();
-  const [{ data: roles }, { data: services }, { data: configRows }, { data: googleAccount }, { data: googleCals }] = await Promise.all([
+  const [{ data: roles }, { data: services }, { data: configRows }, { data: googleAccount }, { data: googleCals }, { data: qboAccount }] = await Promise.all([
     supabase.from('pricing_roles').select('*').order('sort'),
     supabase.from('pricing_page_services').select('*').order('sort'),
     supabase.from('pricing_config').select('*'),
     supabase.from('google_accounts').select('email').maybeSingle(),
     supabase.from('google_calendars').select('id, summary, color, is_primary, included, merge_ssm').order('summary'),
+    supabase.from('qbo_accounts').select('company_name').maybeSingle(),
   ]);
   const config = Object.fromEntries((configRows ?? []).map((c) => [c.key, c.value]));
   const ratesMissing = !roles || roles.length === 0;
@@ -45,6 +48,15 @@ export default async function SettingsPage({
           connectedEmail={googleAccount ? (googleAccount.email ?? null) : undefined}
           calendars={(googleCals ?? []) as GoogleCalendarRow[]}
           flag={googleFlag}
+        />
+      </section>
+
+      <section className="mb-8" id="quickbooks">
+        <h2 className="mb-3 text-sm font-semibold text-slate-900">QuickBooks</h2>
+        <QuickbooksSettings
+          configured={quickbooksConfigured()}
+          companyName={qboAccount ? (qboAccount.company_name ?? null) : undefined}
+          flag={quickbooksFlag}
         />
       </section>
 

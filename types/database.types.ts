@@ -66,6 +66,7 @@ export type Database = {
           onboard_token: string | null;
           onboarded_at: string | null;
           created_at: string;
+          qbo_customer_id: string | null;
         };
         Insert: {
           id?: string;
@@ -78,6 +79,7 @@ export type Database = {
           onboard_token?: string | null;
           onboarded_at?: string | null;
           created_at?: string;
+          qbo_customer_id?: string | null;
         };
         Update: {
           id?: string;
@@ -90,6 +92,7 @@ export type Database = {
           onboard_token?: string | null;
           onboarded_at?: string | null;
           created_at?: string;
+          qbo_customer_id?: string | null;
         };
         Relationships: [];
       };
@@ -322,6 +325,10 @@ export type Database = {
           paid_at: string | null;
           share_token: string | null;
           created_at: string;
+          qbo_invoice_id: string | null;
+          qbo_doc_number: string | null;
+          qbo_synced_at: string | null;
+          qbo_sync_error: string | null;
         };
         Insert: {
           id?: string;
@@ -340,6 +347,10 @@ export type Database = {
           paid_at?: string | null;
           share_token?: string | null;
           created_at?: string;
+          qbo_invoice_id?: string | null;
+          qbo_doc_number?: string | null;
+          qbo_synced_at?: string | null;
+          qbo_sync_error?: string | null;
         };
         Update: {
           id?: string;
@@ -358,6 +369,10 @@ export type Database = {
           paid_at?: string | null;
           share_token?: string | null;
           created_at?: string;
+          qbo_invoice_id?: string | null;
+          qbo_doc_number?: string | null;
+          qbo_synced_at?: string | null;
+          qbo_sync_error?: string | null;
         };
         Relationships: [
           {
@@ -965,6 +980,39 @@ export type Database = {
             referencedColumns: ['id'];
           },
         ];
+      };
+      qbo_accounts: {
+        Row: {
+          user_id: string;
+          realm_id: string;
+          refresh_token: string;
+          access_token: string | null;
+          access_token_expires_at: string | null;
+          default_item_id: string | null;
+          company_name: string | null;
+          connected_at: string;
+        };
+        Insert: {
+          user_id: string;
+          realm_id: string;
+          refresh_token: string;
+          access_token?: string | null;
+          access_token_expires_at?: string | null;
+          default_item_id?: string | null;
+          company_name?: string | null;
+          connected_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          realm_id?: string;
+          refresh_token?: string;
+          access_token?: string | null;
+          access_token_expires_at?: string | null;
+          default_item_id?: string | null;
+          company_name?: string | null;
+          connected_at?: string;
+        };
+        Relationships: [];
       };
       google_accounts: {
         Row: {
