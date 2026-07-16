@@ -10,6 +10,7 @@ import { freeBusy } from '@/lib/google/calendar';
 import { generateSlots, KICKOFF_CONFIG } from '@/lib/scheduling/slots';
 import { WelcomePacket } from '@/components/contracts/welcome-packet';
 import { KickoffBooking } from '@/components/portal/kickoff-booking';
+import { BrandAssets, type Brand, type Tech } from '@/components/portal/brand-assets';
 
 export const metadata = { title: 'Your project hub — Seaside Media' };
 
@@ -35,11 +36,19 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
 
   const { data: portal } = await admin
     .from('client_portal')
-    .select('project_id, kickoff_at, kickoff_link, submitted_at')
+    .select('project_id, kickoff_at, kickoff_link, submitted_at, brand, tech, links')
     .eq('portal_token', token)
     .maybeSingle();
 
   if (!portal) return <InactiveLink />;
+
+  const { data: assetRows } = await admin
+    .from('portal_assets')
+    .select('id, filename')
+    .eq('project_id', portal.project_id)
+    .order('created_at');
+  const assets = (assetRows ?? []).map((a) => ({ id: a.id, filename: a.filename }));
+  const links = Array.isArray(portal.links) ? (portal.links as string[]) : [];
 
   const { data: project } = await admin
     .from('projects')
@@ -109,6 +118,22 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
             A 45-minute call to align on direction, audience, and deliverables before we start.
           </p>
           <KickoffBooking token={token} slots={slots} booked={booked} />
+        </section>
+
+        {/* Brand & asset collection */}
+        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-sm font-semibold text-ink">Your brand & assets</h2>
+          <p className="mb-4 mt-0.5 text-xs text-slate-400">
+            Share your brand details and files so nothing gets lost in email. Save anytime — it’s all in one place.
+          </p>
+          <BrandAssets
+            token={token}
+            initialBrand={(portal.brand as Brand) ?? {}}
+            initialTech={(portal.tech as Tech) ?? {}}
+            initialLinks={links}
+            initialAssets={assets}
+            submittedAt={portal.submitted_at}
+          />
         </section>
 
         {/* Review & revisions (from the signed contract) */}

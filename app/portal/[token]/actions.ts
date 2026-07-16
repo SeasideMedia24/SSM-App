@@ -7,6 +7,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
+import type { Json } from '@/types/database.types';
 import { freeBusy } from '@/lib/google/calendar';
 import { createCalendarEvent } from '@/lib/google/act';
 import { generateSlots, KICKOFF_CONFIG } from '@/lib/scheduling/slots';
@@ -61,4 +62,110 @@ export async function bookKickoff(token: string, slotStart: string): Promise<Boo
 
   revalidatePath(`/portal/${token}`);
   return { ok: true, kickoffAt: slot.startUtc, meetLink };
+}
+
+// ── Brand & asset collection ─────────────────────────────────────────────────
+
+const BUCKET = 'client-assets';
+
+// Resolve a portal token to its project id (or null). Every write below is gated
+// through this — the token is the only credential on this anonymous surface.
+async function projectForToken(admin: ReturnType<typeof createAdminClient>, token: string): Promise<string | null> {
+  if (!token) return null;
+  const { data } = await admin.from('client_portal').select('project_id').eq('portal_token', token).maybeSingle();
+  return data?.project_id ?? null;
+}
+
+const safeName = (name: string) => name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+
+export type UploadTicket = { ok: true; path: string; token: string } | { ok: false; error: string };
+
+// Mint a short-lived signed upload URL so the browser can send the file DIRECTLY
+// to Storage (bypassing the ~4.5MB serverless body limit).
+export async function requestAssetUpload(token: string, filename: string): Promise<UploadTicket> {
+  const admin = createAdminClient();
+  const projectId = await projectForToken(admin, token);
+  if (!projectId) return { ok: false, error: 'This project link isn’t active anymore.' };
+
+  const path = `${projectId}/${crypto.randomUUID()}-${safeName(filename || 'file')}`;
+  const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(path);
+  if (error || !data) return { ok: false, error: 'Could not start the upload. Please try again.' };
+  return { ok: true, path: data.path, token: data.token };
+}
+
+export type AssetResult = { ok: true } | { ok: false; error: string };
+export type RecordResult = { ok: true; id: string } | { ok: false; error: string };
+
+// Record an asset row after the browser finished uploading to `path`.
+export async function recordUploadedAsset(
+  token: string,
+  meta: { path: string; filename: string; size: number; contentType: string | null },
+): Promise<RecordResult> {
+  const admin = createAdminClient();
+  const projectId = await projectForToken(admin, token);
+  if (!projectId) return { ok: false, error: 'This project link isn’t active anymore.' };
+  // The path must live under this project's folder — never trust the client's path.
+  if (!meta.path.startsWith(`${projectId}/`)) return { ok: false, error: 'Invalid upload path.' };
+
+  const { data, error } = await admin.from('portal_assets').insert({
+    project_id: projectId,
+    storage_path: meta.path,
+    filename: meta.filename.slice(0, 200),
+    size: meta.size,
+    content_type: meta.contentType,
+  }).select('id').single();
+  if (error || !data) return { ok: false, error: 'Could not save the file. Please try again.' };
+  revalidatePath(`/portal/${token}`);
+  return { ok: true, id: data.id };
+}
+
+export async function removeAsset(token: string, assetId: string): Promise<AssetResult> {
+  const admin = createAdminClient();
+  const projectId = await projectForToken(admin, token);
+  if (!projectId) return { ok: false, error: 'This project link isn’t active anymore.' };
+
+  const { data: asset } = await admin
+    .from('portal_assets')
+    .select('storage_path')
+    .eq('id', assetId)
+    .eq('project_id', projectId)
+    .maybeSingle();
+  if (!asset) return { ok: false, error: 'That file is already gone.' };
+
+  await admin.storage.from(BUCKET).remove([asset.storage_path]);
+  await admin.from('portal_assets').delete().eq('id', assetId);
+  revalidatePath(`/portal/${token}`);
+  return { ok: true };
+}
+
+// Save the brand / tech / links fields (partial saves as the client types).
+export async function saveIntake(
+  token: string,
+  intake: { brand?: unknown; tech?: unknown; links?: unknown },
+): Promise<AssetResult> {
+  const admin = createAdminClient();
+  const projectId = await projectForToken(admin, token);
+  if (!projectId) return { ok: false, error: 'This project link isn’t active anymore.' };
+
+  const { error } = await admin
+    .from('client_portal')
+    .update({
+      brand: (intake.brand ?? null) as Json,
+      tech: (intake.tech ?? null) as Json,
+      links: (intake.links ?? null) as Json,
+    })
+    .eq('project_id', projectId);
+  if (error) return { ok: false, error: 'Could not save. Please try again.' };
+  revalidatePath(`/portal/${token}`);
+  return { ok: true };
+}
+
+// Mark the intake submitted (owner sees it's ready to review).
+export async function submitIntake(token: string): Promise<AssetResult> {
+  const admin = createAdminClient();
+  const projectId = await projectForToken(admin, token);
+  if (!projectId) return { ok: false, error: 'This project link isn’t active anymore.' };
+  await admin.from('client_portal').update({ submitted_at: new Date().toISOString() }).eq('project_id', projectId);
+  revalidatePath(`/portal/${token}`);
+  return { ok: true };
 }

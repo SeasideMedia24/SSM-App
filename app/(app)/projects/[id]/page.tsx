@@ -2,7 +2,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { PortalLinkControl } from '@/components/portal/portal-link-control';
+import { ClientSubmission } from '@/components/portal/client-submission';
 import { buttonClass } from '@/components/ui/button-styles';
 import { DeleteProjectButton } from '@/components/projects/delete-project-button';
 import { ViewSwitcher } from '@/components/projects/view-switcher';
@@ -56,9 +58,29 @@ export default async function ProjectDetailPage({
     supabase.from('pricing_config').select('*'),
     // Team members with logins — the assignable people for this project's tasks.
     supabase.from('contractors').select('name, user_id').not('user_id', 'is', null).order('name'),
-    // Client portal link (table may not exist pre-migration — handled gracefully).
-    supabase.from('client_portal').select('portal_token').eq('project_id', id).maybeSingle(),
+    // Client portal (table may not exist pre-migration — handled gracefully).
+    supabase.from('client_portal').select('portal_token, brand, tech, links, submitted_at').eq('project_id', id).maybeSingle(),
   ]);
+
+  // If the client has submitted portal details, pull their files and sign
+  // download URLs (private bucket → admin client, owner-gated by this page).
+  let submission: { assets: { filename: string; url: string | null }[] } | null = null;
+  const hasPortalContent = !!(portal && (portal.submitted_at || portal.brand || portal.links));
+  if (hasPortalContent) {
+    const admin = createAdminClient();
+    const { data: assetRows } = await admin
+      .from('portal_assets')
+      .select('storage_path, filename')
+      .eq('project_id', id)
+      .order('created_at');
+    const assets = await Promise.all(
+      (assetRows ?? []).map(async (a) => {
+        const { data } = await admin.storage.from('client-assets').createSignedUrl(a.storage_path, 3600);
+        return { filename: a.filename, url: data?.signedUrl ?? null };
+      }),
+    );
+    submission = { assets };
+  }
 
   const meta = projectStatusMeta(project.status);
   const cl = client(project.clients as ClientRel);
@@ -154,6 +176,16 @@ export default async function ProjectDetailPage({
             </p>
             <PortalLinkControl projectId={project.id} token={(portal?.portal_token as string | null) ?? null} />
           </div>
+
+          {hasPortalContent && submission && (
+            <ClientSubmission
+              brand={(portal?.brand as Record<string, string>) ?? {}}
+              tech={(portal?.tech as Record<string, string>) ?? {}}
+              links={Array.isArray(portal?.links) ? (portal.links as string[]) : []}
+              assets={submission.assets}
+              submittedAt={portal?.submitted_at ?? null}
+            />
+          )}
         </div>
       )}
     </>
