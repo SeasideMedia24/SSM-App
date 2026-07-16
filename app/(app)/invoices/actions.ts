@@ -8,6 +8,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createClient as createSupabaseServer } from '@/lib/supabase/server';
 import { createInvoiceFromQuoteId } from '@/lib/invoices/create';
+import { pushInvoiceToQbo, sendQboInvoice } from '@/lib/quickbooks/invoices';
 import type { InvoiceStatus } from '@/types/database.types';
 
 // Create a draft invoice from an existing quote, then open it. The copy logic is
@@ -91,6 +92,38 @@ export async function generateInvoiceShareToken(invoiceId: string): Promise<Shar
   }
   revalidatePath(`/invoices/${invoiceId}`);
   return { ok: true, token };
+}
+
+// ── QuickBooks ──────────────────────────────────────────────────────────────
+// Two explicit steps (sync, then send) so nothing is emailed to a real client by
+// accident. Both return a result object the panel can show.
+
+export type QboResult = { ok: true; message: string } | { ok: false; error: string };
+
+export async function syncInvoiceToQuickbooks(invoiceId: string): Promise<QboResult> {
+  if (typeof invoiceId !== 'string' || invoiceId.length === 0) return { ok: false, error: 'Missing invoice.' };
+  const supabase = await createSupabaseServer();
+  try {
+    const { docNumber } = await pushInvoiceToQbo(supabase, invoiceId);
+    revalidatePath(`/invoices/${invoiceId}`);
+    return { ok: true, message: docNumber ? `Synced to QuickBooks as invoice #${docNumber}.` : 'Synced to QuickBooks.' };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'QuickBooks sync failed.' };
+  }
+}
+
+export async function sendInvoiceViaQuickbooks(invoiceId: string): Promise<QboResult> {
+  if (typeof invoiceId !== 'string' || invoiceId.length === 0) return { ok: false, error: 'Missing invoice.' };
+  const supabase = await createSupabaseServer();
+  try {
+    const { sentTo } = await sendQboInvoice(supabase, invoiceId);
+    revalidatePath(`/invoices/${invoiceId}`);
+    revalidatePath('/invoices');
+    revalidatePath('/dashboard');
+    return { ok: true, message: `QuickBooks emailed the invoice to ${sentTo}.` };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'QuickBooks send failed.' };
+  }
 }
 
 export async function revokeInvoiceShareToken(invoiceId: string): Promise<ShareResult> {

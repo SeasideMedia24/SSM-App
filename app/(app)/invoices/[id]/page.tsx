@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/page-header';
 import { InvoiceStatusSelect } from '@/components/invoices/invoice-status-select';
 import { DeleteInvoiceButton } from '@/components/invoices/delete-invoice-button';
 import { ShareInvoiceControl } from '@/components/invoices/share-invoice-control';
+import { QuickbooksPanel } from '@/components/invoices/quickbooks-panel';
 import { updateInvoiceDueDate } from '../actions';
 import { money, fmtDate } from '@/lib/projects/format';
 import type { InvoiceStatus } from '@/types/database.types';
@@ -17,11 +18,14 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
 
-  const { data: invoice } = await supabase
-    .from('invoices')
-    .select('*, clients ( id, name ), projects ( id, title )')
-    .eq('id', id)
-    .single();
+  const [{ data: invoice }, { data: qboAccount }] = await Promise.all([
+    supabase
+      .from('invoices')
+      .select('*, clients ( id, name, email ), projects ( id, title )')
+      .eq('id', id)
+      .single(),
+    supabase.from('qbo_accounts').select('user_id').maybeSingle(),
+  ]);
   if (!invoice) notFound();
 
   const { data: lineItems } = await supabase
@@ -30,7 +34,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
     .eq('invoice_id', id)
     .order('position');
 
-  const client = one(invoice.clients as Rel);
+  const client = one(invoice.clients as Rel) as { id: string; name?: string; email?: string | null } | null;
   const project = one(invoice.projects as Rel);
   const items = lineItems ?? [];
   const overdue = invoice.status === 'sent' && invoice.due_date && invoice.due_date < today;
@@ -54,6 +58,18 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
       {/* Client-facing document: create/copy the private link, or open to print. */}
       <div className="mb-6">
         <ShareInvoiceControl invoiceId={invoice.id} token={(invoice.share_token as string | null) ?? null} />
+      </div>
+
+      {/* QuickBooks: sync + send through the owner's books. */}
+      <div className="mb-6">
+        <QuickbooksPanel
+          invoiceId={invoice.id}
+          connected={!!qboAccount}
+          clientEmail={client?.email ?? null}
+          qboDocNumber={(invoice.qbo_doc_number as string | null) ?? null}
+          qboSyncError={(invoice.qbo_sync_error as string | null) ?? null}
+          alreadySynced={!!invoice.qbo_invoice_id}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_16rem]">
