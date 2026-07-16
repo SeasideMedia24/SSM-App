@@ -163,8 +163,8 @@ type QuoteRow = {
 
 function QuotesTable({ rows }: { rows: QuoteRow[] }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <table className="w-full text-sm">
+    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <table className="w-full min-w-[52rem] text-sm">
         <thead>
           <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
             <th className="px-4 py-3 font-medium">Quote</th>
@@ -194,25 +194,30 @@ function QuotesTable({ rows }: { rows: QuoteRow[] }) {
                 <td className="px-4 py-3 text-slate-600">
                   {new Date(q.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <div className="flex items-center justify-end gap-3">
-                    <Link href={`/calculator?quote=${q.id}`} className="text-xs font-medium text-sea hover:underline">
+                <td className="px-4 py-3">
+                  {/* Fixed-width action columns so every row lines up flush. */}
+                  <div className="flex items-center justify-end gap-4 whitespace-nowrap">
+                    <Link href={`/calculator?quote=${q.id}`} className="w-9 text-right text-xs font-medium text-sea hover:underline">
                       Open
                     </Link>
-                    <form action={createInvoiceFromQuote}>
+                    <form action={createInvoiceFromQuote} className="w-20 text-right">
                       <input type="hidden" name="quote_id" value={q.id} />
-                      <button type="submit" className="text-xs font-medium text-sea hover:underline">
-                        Create invoice
+                      <button type="submit" title="Create an invoice from this quote" className="text-xs font-medium text-sea hover:underline">
+                        Invoice
                       </button>
                     </form>
-                    <form action={createContractFromQuote}>
+                    <form action={createContractFromQuote} className="w-20 text-right">
                       <input type="hidden" name="quote_id" value={q.id} />
-                      <button type="submit" className="text-xs font-medium text-sea hover:underline">
-                        Generate contract
+                      <button type="submit" title="Generate a contract from this quote" className="text-xs font-medium text-sea hover:underline">
+                        Contract
                       </button>
                     </form>
-                    <ShareQuoteControl quoteId={q.id} token={q.share_token} />
-                    <DeleteQuoteButton quoteId={q.id} quoteTitle={q.title} />
+                    <span className="inline-flex w-14 justify-end">
+                      <ShareQuoteControl quoteId={q.id} token={q.share_token} />
+                    </span>
+                    <span className="inline-flex w-12 justify-end">
+                      <DeleteQuoteButton quoteId={q.id} quoteTitle={q.title} />
+                    </span>
                   </div>
                 </td>
               </tr>
