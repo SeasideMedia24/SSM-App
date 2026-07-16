@@ -12,9 +12,10 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 // Routes a signed-out user is allowed to see: login, auth callbacks, the
-// public onboarding forms, shared quote/invoice links, and the set-password
-// page an invited team member lands on (it checks its own session).
-const PUBLIC_PREFIXES = ['/login', '/auth', '/onboard', '/contractor-onboard', '/quote', '/invoice', '/welcome'];
+// public onboarding forms, shared quote/invoice/contract links, the client
+// portal, and the set-password page an invited team member lands on (it checks
+// its own session).
+const PUBLIC_PREFIXES = ['/login', '/auth', '/onboard', '/contractor-onboard', '/quote', '/invoice', '/contract', '/portal', '/welcome'];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
