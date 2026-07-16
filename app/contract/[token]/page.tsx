@@ -50,7 +50,7 @@ export default async function SharedContractPage({ params }: { params: Promise<{
 
   const { data: contract } = await admin
     .from('contracts')
-    .select('id, status, body_md, signer_name, deposit_amount, production_amount, delivery_amount, deliverables_snapshot, deposit_invoice_id, projects ( title, clients ( name, company ) )')
+    .select('id, status, body_md, signer_name, project_id, deposit_amount, production_amount, delivery_amount, deliverables_snapshot, deposit_invoice_id, projects ( title, clients ( name, company ) )')
     .eq('share_token', token)
     .single();
 
@@ -63,6 +63,7 @@ export default async function SharedContractPage({ params }: { params: Promise<{
 
   // For the welcome packet's "pay deposit" CTA, resolve the invoice's public link.
   let depositInvoiceUrl: string | null = null;
+  let portalUrl: string | null = null;
   if (signed && contract.deposit_invoice_id) {
     const { data: inv } = await admin
       .from('invoices')
@@ -70,6 +71,15 @@ export default async function SharedContractPage({ params }: { params: Promise<{
       .eq('id', contract.deposit_invoice_id)
       .single();
     if (inv?.share_token) depositInvoiceUrl = `/invoice/${inv.share_token}`;
+  }
+  // If the owner has opened the client portal for this project, offer it next.
+  if (signed && contract.project_id) {
+    const { data: portal } = await admin
+      .from('client_portal')
+      .select('portal_token')
+      .eq('project_id', contract.project_id)
+      .maybeSingle();
+    if (portal?.portal_token) portalUrl = `/portal/${portal.portal_token}`;
   }
 
   return (
@@ -98,6 +108,7 @@ export default async function SharedContractPage({ params }: { params: Promise<{
             productionAmount={Number(contract.production_amount ?? 0)}
             deliveryAmount={Number(contract.delivery_amount ?? 0)}
             depositInvoiceUrl={depositInvoiceUrl}
+            portalUrl={portalUrl}
           />
         ) : (
           <div className="print:hidden">

@@ -981,6 +981,72 @@ export type Database = {
           },
         ];
       };
+      client_portal: {
+        Row: {
+          project_id: string;
+          portal_token: string | null;
+          brand: Json | null;
+          tech: Json | null;
+          links: Json | null;
+          kickoff_at: string | null;
+          kickoff_link: string | null;
+          submitted_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          project_id: string;
+          portal_token?: string | null;
+          brand?: Json | null;
+          tech?: Json | null;
+          links?: Json | null;
+          kickoff_at?: string | null;
+          kickoff_link?: string | null;
+          submitted_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          project_id?: string;
+          portal_token?: string | null;
+          brand?: Json | null;
+          tech?: Json | null;
+          links?: Json | null;
+          kickoff_at?: string | null;
+          kickoff_link?: string | null;
+          submitted_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      portal_assets: {
+        Row: {
+          id: string;
+          project_id: string;
+          storage_path: string;
+          filename: string;
+          size: number | null;
+          content_type: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          storage_path: string;
+          filename: string;
+          size?: number | null;
+          content_type?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          storage_path?: string;
+          filename?: string;
+          size?: number | null;
+          content_type?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       qbo_accounts: {
         Row: {
           user_id: string;

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
+import { PortalLinkControl } from '@/components/portal/portal-link-control';
 import { buttonClass } from '@/components/ui/button-styles';
 import { DeleteProjectButton } from '@/components/projects/delete-project-button';
 import { ViewSwitcher } from '@/components/projects/view-switcher';
@@ -44,7 +45,7 @@ export default async function ProjectDetailPage({
   const [
     { data: tasks }, { data: deliverables }, { data: contracts },
     { data: quotes }, { data: roles }, { data: services }, { data: configRows },
-    { data: teamLogins },
+    { data: teamLogins }, { data: portal },
   ] = await Promise.all([
     supabase.from('tasks').select('id, title, status, priority, due_date, assignee_id, worker_note').eq('project_id', id).order('created_at'),
     supabase.from('deliverables').select('*').eq('project_id', id).order('position'),
@@ -55,6 +56,8 @@ export default async function ProjectDetailPage({
     supabase.from('pricing_config').select('*'),
     // Team members with logins — the assignable people for this project's tasks.
     supabase.from('contractors').select('name, user_id').not('user_id', 'is', null).order('name'),
+    // Client portal link (table may not exist pre-migration — handled gracefully).
+    supabase.from('client_portal').select('portal_token').eq('project_id', id).maybeSingle(),
   ]);
 
   const meta = projectStatusMeta(project.status);
@@ -141,6 +144,16 @@ export default async function ProjectDetailPage({
               <p className="whitespace-pre-wrap text-sm text-slate-800">{project.description}</p>
             </div>
           )}
+
+          {/* Client portal — the private hub the client uses to book their
+              kickoff, share brand assets, and see how revisions work. */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm font-semibold text-ink">Client portal</p>
+            <p className="mb-3 mt-0.5 text-xs text-slate-400">
+              Share this private link with {cl?.name ?? 'the client'} after they sign — it’s their hub for the kickoff, brand assets, and revisions.
+            </p>
+            <PortalLinkControl projectId={project.id} token={(portal?.portal_token as string | null) ?? null} />
+          </div>
         </div>
       )}
     </>

@@ -13,6 +13,7 @@ export type WelcomePacketProps = {
   productionAmount: number;
   deliveryAmount: number;
   depositInvoiceUrl: string | null;
+  portalUrl?: string | null; // the client's project hub, if a link exists
 };
 
 export function WelcomePacket(p: WelcomePacketProps) {
@@ -84,6 +85,15 @@ export function WelcomePacket(p: WelcomePacketProps) {
           </ol>
         </section>
       </div>
+
+      {p.portalUrl && (
+        <a
+          href={p.portalUrl}
+          className="brand-gradient mx-auto rounded-xl px-6 py-3 text-center text-sm font-semibold text-white shadow-lg shadow-deep/20 transition hover:brightness-110"
+        >
+          Continue to your project hub →
+        </a>
+      )}
 
       <p className="text-center text-xs text-slate-400">
         Questions? Reach us at jeremy@seasidemedia.co — we’ll be in touch to schedule your creative kickoff.
