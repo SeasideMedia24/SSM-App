@@ -229,7 +229,7 @@ describe('action name helpers', () => {
 
 describe('autonomy policy (owner, 2026-07-11)', () => {
   // "Outside-world" actions need a Confirm click; everything else is auto.
-  const GATED: ActionName[] = ['create_invoice', 'send_email', 'create_event'];
+  const GATED: ActionName[] = ['create_invoice', 'send_email', 'create_event', 'send_invoice'];
 
   it('gates exactly the outside-world actions; everything else is auto', () => {
     for (const name of Object.keys(actionSchemas) as ActionName[]) {
@@ -290,7 +290,7 @@ describe('expanded action schemas', () => {
 
   it('keeps the confirm gate on the outside-world actions only', () => {
     const gated = (Object.keys(actionSchemas) as ActionName[]).filter(requiresConfirmation);
-    expect(gated.sort()).toEqual(['create_event', 'create_invoice', 'send_email']);
+    expect(gated.sort()).toEqual(['create_event', 'create_invoice', 'send_email', 'send_invoice']);
     // Gated tools keep the propose_ prefix; auto tools use the bare name.
     expect(toolNameFor('create_invoice')).toBe('propose_create_invoice');
     expect(toolNameFor('send_email')).toBe('propose_send_email');

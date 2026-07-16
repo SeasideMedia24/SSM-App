@@ -223,6 +223,8 @@ const actionDescriptions: Record<ActionName, string> = {
     'Propose sending a real email from the owner\'s connected Gmail. Shows a confirmation card with recipient, subject, and body — NOTHING sends until the owner clicks Confirm. Use the real recipient address (look the client up with list_clients); never invent one. Write the full body ready to send.',
   create_event:
     'Propose booking a real Google Calendar event (with a Google Meet link by default). Shows a confirmation card — nothing is booked until the owner clicks Confirm; on Confirm, Google emails invites to any attendees. Times are local wall-clock (YYYY-MM-DDTHH:MM) in time_zone (default America/New_York). Look up attendee emails (list_clients/list_contractors); never guess an address.',
+  send_invoice:
+    'Propose SENDING an existing invoice to the client through QuickBooks: on Confirm it syncs the invoice to QuickBooks and QuickBooks emails it with a Pay-Now link. Look the invoice up first (list_invoices) to get its id. Requires QuickBooks connected and the client to have an email — if either is missing, the proposal is declined with the reason, so tell the owner what to fix rather than trying to send. NOTHING sends until the owner clicks Confirm.',
 };
 
 // "create_task" for auto actions; "propose_create_invoice" for gated ones.

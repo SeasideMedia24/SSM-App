@@ -20,6 +20,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database.types';
 import { createInvoiceFromQuoteId } from '@/lib/invoices/create';
 import { sendGmail, createCalendarEvent } from '@/lib/google/act';
+import { pushInvoiceToQbo, sendQboInvoice } from '@/lib/quickbooks/invoices';
 
 type DB = SupabaseClient<Database>;
 
@@ -238,6 +239,12 @@ export const actionSchemas = {
     attendees: z.array(z.email()).max(20).optional(),
     with_meet: z.boolean().optional(), // default true — include a Google Meet link
   }),
+
+  // Send an existing invoice to the client THROUGH QuickBooks: syncs it to QB,
+  // then QuickBooks emails it with a Pay-Now link. Always behind a Confirm card.
+  send_invoice: z.strictObject({
+    invoice_id: uuid,
+  }),
 } as const;
 
 export type ActionName = keyof typeof actionSchemas;
@@ -258,6 +265,7 @@ const CONFIRM_ACTIONS: ReadonlySet<ActionName> = new Set<ActionName>([
   'create_invoice',
   'send_email',
   'create_event',
+  'send_invoice',
 ]);
 
 export function requiresConfirmation(action: ActionName): boolean {
@@ -501,6 +509,26 @@ export async function buildProposal(
         : 'No attendees — goes on your calendar only.',
     );
     if (params.with_meet !== false) lines.push('Includes a Google Meet link.');
+  }
+
+  // send_invoice readiness: bail with a clear list of what's missing so PaePae
+  // tells the owner to fix it rather than showing a card that will fail. This is
+  // the same "check before send" gate the invoice page and the owner use.
+  if (action === 'send_invoice' && typeof params.invoice_id === 'string') {
+    const [{ data: qbo }, { data: inv }, { count: lineCount }] = await Promise.all([
+      supabase.from('qbo_accounts').select('user_id').maybeSingle(),
+      supabase.from('invoices').select('clients ( name, email )').eq('id', params.invoice_id).maybeSingle(),
+      supabase.from('invoice_line_items').select('id', { count: 'exact', head: true }).eq('invoice_id', params.invoice_id),
+    ]);
+    const client = (inv?.clients as unknown as { name: string; email: string | null } | null) ?? null;
+    const missing: string[] = [];
+    if (!qbo) missing.push('QuickBooks isn’t connected (Settings → QuickBooks)');
+    if (!client?.email) missing.push(`the client${client?.name ? ` (${client.name})` : ''} has no email address on file`);
+    if (!lineCount || lineCount === 0) missing.push('the invoice has no line items');
+    if (missing.length > 0) {
+      return { ok: false, error: `Can’t send this invoice yet — ${missing.join('; ')}. Fix that, then ask me again.` };
+    }
+    lines.push('On Confirm: syncs to QuickBooks, then QuickBooks emails it with a Pay-Now link.');
   }
 
   return { ok: true, proposal: { action, params, summary: lines } };
@@ -772,6 +800,16 @@ export async function executeAction(
       if (!result.ok) throw new Error(result.error);
       return result.detail;
     }
+
+    // Sends the invoice THROUGH QuickBooks (syncs it, then QB emails the Pay-Now
+    // invoice). Only reachable after the owner's Confirm click (send_invoice is in
+    // CONFIRM_ACTIONS); readiness was checked at propose time in buildProposal.
+    case 'send_invoice': {
+      const p = parsed.data as ActionParams<'send_invoice'>;
+      await pushInvoiceToQbo(supabase, p.invoice_id);
+      const { sentTo } = await sendQboInvoice(supabase, p.invoice_id);
+      return `Sent the invoice through QuickBooks — it emailed the Pay-Now invoice to ${sentTo}.`;
+    }
   }
 }
 
@@ -809,5 +847,7 @@ export function pathsToRevalidate(action: ActionName): string[] {
       return [];
     case 'create_event':
       return ['/dashboard']; // the calendar block shows the new event
+    case 'send_invoice':
+      return ['/invoices', '/dashboard'];
   }
 }
