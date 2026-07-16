@@ -6,7 +6,10 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizeDeliverables } from '@/lib/contracts/template';
+import { freeBusy } from '@/lib/google/calendar';
+import { generateSlots, KICKOFF_CONFIG } from '@/lib/scheduling/slots';
 import { WelcomePacket } from '@/components/contracts/welcome-packet';
+import { KickoffBooking } from '@/components/portal/kickoff-booking';
 
 export const metadata = { title: 'Your project hub — Seaside Media' };
 
@@ -60,6 +63,18 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
   const rounds = contract?.revision_rounds ?? 2;
   const pct = contract?.revision_pct ?? 100;
 
+  // Kickoff: show the confirmed booking, or compute open slots from the owner's
+  // real availability (empty if Google isn't connected — the picker then invites
+  // the client to reach out).
+  const booked = portal.kickoff_at ? { at: portal.kickoff_at, link: portal.kickoff_link } : null;
+  let slots: import('@/lib/scheduling/slots').Slot[] = [];
+  if (!booked) {
+    const now = new Date();
+    const timeMax = new Date(now.getTime() + (KICKOFF_CONFIG.horizonDays + 1) * 86_400_000);
+    const fb = await freeBusy(admin, { timeMin: now.toISOString(), timeMax: timeMax.toISOString() });
+    if (fb.ok) slots = generateSlots(now, fb.busy, KICKOFF_CONFIG).slice(0, 40);
+  }
+
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-10">
       <div className="mx-auto max-w-3xl">
@@ -86,6 +101,15 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
             depositInvoiceUrl={null}
           />
         )}
+
+        {/* Creative kickoff — self-serve booking against the owner's calendar */}
+        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-sm font-semibold text-ink">Book your creative kickoff</h2>
+          <p className="mb-3 mt-0.5 text-xs text-slate-400">
+            A 45-minute call to align on direction, audience, and deliverables before we start.
+          </p>
+          <KickoffBooking token={token} slots={slots} booked={booked} />
+        </section>
 
         {/* Review & revisions (from the signed contract) */}
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
