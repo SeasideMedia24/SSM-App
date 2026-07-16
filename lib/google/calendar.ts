@@ -108,6 +108,39 @@ export async function googleAccessToken(
   return { ok: true, token };
 }
 
+// ── Free/busy (for kickoff scheduling) ───────────────────────────────────────
+
+// Busy intervals across the owner's INCLUDED calendars in a window. Used by the
+// client portal's self-serve kickoff booking to compute open slots. Call with
+// the admin client from the anonymous portal so it reads the OWNER's calendar.
+export async function freeBusy(
+  supabase: DB,
+  range: { timeMin: string; timeMax: string },
+): Promise<{ ok: true; busy: { start: string; end: string }[] } | { ok: false; error: string }> {
+  const auth = await googleAccessToken(supabase);
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const account = await getGoogleAccount(supabase);
+
+  const { data: cals } = await supabase
+    .from('google_calendars')
+    .select('id')
+    .eq('user_id', account?.user_id ?? '')
+    .eq('included', true);
+  const items = cals && cals.length > 0 ? cals.map((c) => ({ id: c.id })) : [{ id: 'primary' }];
+
+  const res = await fetch(`${API}/freeBusy`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ timeMin: range.timeMin, timeMax: range.timeMax, items }),
+  });
+  if (!res.ok) return { ok: false, error: 'Could not read availability from Google.' };
+
+  const json = (await res.json()) as { calendars?: Record<string, { busy?: { start: string; end: string }[] }> };
+  const busy: { start: string; end: string }[] = [];
+  for (const cal of Object.values(json.calendars ?? {})) for (const b of cal.busy ?? []) busy.push(b);
+  return { ok: true, busy };
+}
+
 // ── Calendar list ────────────────────────────────────────────────────────────
 
 // Pull the user's calendar list from Google and mirror it into

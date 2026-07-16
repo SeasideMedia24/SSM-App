@@ -18,7 +18,9 @@ type DB = SupabaseClient<Database>;
 const SCOPE_HINT =
   'Google needs updated permissions for this — open Settings → Google Calendar, click “Update permissions”, approve at Google, then ask me again.';
 
-type ActResult = { ok: true; detail: string } | { ok: false; error: string };
+type ActResult =
+  | { ok: true; detail: string; meetLink?: string | null; htmlLink?: string | null }
+  | { ok: false; error: string };
 
 // RFC 2047-encode a header value so subjects with any characters survive.
 const encodeHeader = (v: string) => `=?UTF-8?B?${Buffer.from(v, 'utf8').toString('base64')}?=`;
@@ -120,5 +122,5 @@ export async function createCalendarEvent(
     created.hangoutLink ? `Google Meet: ${created.hangoutLink}` : null,
     created.htmlLink ? `Calendar: ${created.htmlLink}` : null,
   ].filter(Boolean);
-  return { ok: true, detail: bits.join('\n') };
+  return { ok: true, detail: bits.join('\n'), meetLink: created.hangoutLink ?? null, htmlLink: created.htmlLink ?? null };
 }
