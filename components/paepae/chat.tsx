@@ -8,11 +8,16 @@
 // an ordered list of parts: markdown text, "looked something up" chips, and
 // proposal cards. A proposal only executes when the user confirms it here.
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
+import {
+  saveConversation, listConversations, getConversation, deleteConversation,
+  type ConversationSummary,
+} from '@/app/(app)/paepae/actions';
+import type { Json } from '@/types/database.types';
 
 // ── Types mirroring the server's stream events ──────────────────────────────
 
@@ -75,6 +80,58 @@ export function PaePaeChat() {
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  // ── Saved conversations ─────────────────────────────────────────────────────
+  // Every completed turn autosaves the full rich transcript, so closing the dock
+  // or leaving the page never loses a chat. convId is a ref (not state): saves
+  // fire from debounced timeouts and must always see the latest id.
+  const convId = useRef<string | null>(null);
+  const messagesRef = useRef<Msg[]>(messages);
+  messagesRef.current = messages;
+  const savingRef = useRef(false);
+  const dirtyRef = useRef(false);
+
+  const persist = useCallback(async () => {
+    const msgs = messagesRef.current;
+    if (msgs.length === 0) return;
+    if (savingRef.current) {
+      dirtyRef.current = true; // a save is in flight — run again after it lands
+      return;
+    }
+    savingRef.current = true;
+    try {
+      const res = await saveConversation(convId.current, titleFor(msgs), msgs as unknown as Json);
+      if ('id' in res) convId.current = res.id;
+    } finally {
+      savingRef.current = false;
+      if (dirtyRef.current) {
+        dirtyRef.current = false;
+        void persist();
+      }
+    }
+  }, []);
+
+  // Debounced autosave whenever the transcript settles (turn done, proposal
+  // confirmed/cancelled). Skipped mid-stream to avoid saving half a reply.
+  useEffect(() => {
+    if (busy || messages.length === 0) return;
+    const t = setTimeout(() => void persist(), 600);
+    return () => clearTimeout(t);
+  }, [messages, busy, persist]);
+
+  function newChat() {
+    if (busy) return;
+    convId.current = null;
+    setMessages([]);
+  }
+
+  async function openConversation(id: string) {
+    if (busy) return;
+    const data = await getConversation(id);
+    if (!data || !Array.isArray(data.messages)) return;
+    convId.current = data.id;
+    setMessages(data.messages as unknown as Msg[]);
+  }
 
   // Keep the newest content in view as it streams in.
   useEffect(() => {
@@ -235,6 +292,18 @@ export function PaePaeChat() {
 
   return (
     <div className="flex h-[calc(100vh-11rem)] flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
+      {/* Saved-chats bar: resume a past conversation or start fresh. */}
+      <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-1.5">
+        <HistoryMenu disabled={busy} activeId={convId.current} onOpen={openConversation} />
+        <button
+          type="button"
+          onClick={newChat}
+          disabled={busy || messages.length === 0}
+          className="rounded-lg px-2.5 py-1 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-sea disabled:opacity-40"
+        >
+          + New chat
+        </button>
+      </div>
       <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-5 py-6">
         {showEmpty ? (
           <div className="mx-auto max-w-lg pt-10 text-center">
@@ -459,6 +528,101 @@ function IconBolt() {
     <svg width={12} height={12} viewBox="0 0 24 24" fill="currentColor">
       <path d="M13 2 4.5 13.5H11L9.5 22 19 10h-6.5L13 2Z" />
     </svg>
+  );
+}
+
+// ── Saved conversations ──────────────────────────────────────────────────────
+
+// A conversation's list title: its first user message, truncated.
+function titleFor(msgs: Msg[]): string {
+  for (const m of msgs) {
+    if (m.role !== 'user') continue;
+    const text = m.parts.map((p) => (p.kind === 'text' ? p.text : '')).join(' ').trim();
+    if (text) return text.length > 60 ? `${text.slice(0, 60)}…` : text;
+  }
+  return 'New chat';
+}
+
+// "History ▾" dropdown: pick a saved conversation to resume, or delete one
+// (two-step confirm — CLAUDE.md #4). The list is fetched fresh on open so it
+// reflects chats saved from other pages/the dock.
+function HistoryMenu({
+  disabled, activeId, onOpen,
+}: {
+  disabled: boolean;
+  activeId: string | null;
+  onOpen: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<ConversationSummary[]>([]);
+  const [confirming, setConfirming] = useState<string | null>(null);
+
+  async function toggle() {
+    if (disabled) return;
+    if (!open) setItems(await listConversations());
+    setConfirming(null);
+    setOpen((o) => !o);
+  }
+
+  async function remove(id: string) {
+    await deleteConversation(id);
+    setItems((prev) => prev.filter((c) => c.id !== id));
+    setConfirming(null);
+  }
+
+  return (
+    <span className="relative">
+      <button
+        type="button"
+        onClick={toggle}
+        disabled={disabled}
+        className="rounded-lg px-2.5 py-1 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-sea disabled:opacity-40"
+      >
+        History ▾
+      </button>
+      {open && (
+        <div className="absolute left-0 top-7 z-30 max-h-72 w-72 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+          {items.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-slate-400">No saved chats yet — they save automatically as you talk.</p>
+          ) : (
+            items.map((c) => (
+              <div key={c.id} className={`flex items-center gap-1 px-1.5 ${c.id === activeId ? 'bg-teal/5' : ''}`}>
+                <button
+                  type="button"
+                  onClick={() => { onOpen(c.id); setOpen(false); }}
+                  className="flex-1 truncate rounded-lg px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-50"
+                  title={c.title}
+                >
+                  {c.title}
+                  <span className="ml-1.5 text-[10px] text-slate-400">
+                    {new Date(c.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </span>
+                </button>
+                {confirming === c.id ? (
+                  <span className="flex items-center gap-1 pr-1">
+                    <button type="button" onClick={() => remove(c.id)} className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-red-500">
+                      Delete
+                    </button>
+                    <button type="button" onClick={() => setConfirming(null)} className="text-[10px] text-slate-400 hover:text-slate-600">
+                      Cancel
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirming(c.id)}
+                    aria-label={`Delete ${c.title}`}
+                    className="pr-1 text-xs text-slate-300 hover:text-red-500"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </span>
   );
 }
 
