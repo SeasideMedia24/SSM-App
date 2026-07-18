@@ -39,6 +39,7 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   { href: '/my-tasks', label: 'My Tasks', icon: <IconCheck /> },
+  { href: '/brainstorm', label: 'Brainstorming', icon: <IconSpark /> },
   { href: '/calculator', label: 'Calculator', icon: <IconCalc /> },
   { href: '/invoices', label: 'Invoices', icon: <IconReceipt /> },
   { href: '/settings', label: 'Settings', icon: <IconGear /> },
