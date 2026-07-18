@@ -30,6 +30,82 @@ export type Json = string | number | boolean | null | { [key: string]: Json } | 
 export type Database = {
   public: {
     Tables: {
+      boards: {
+        Row: {
+          id: string;
+          kind: 'storyboard' | 'shotlist' | 'brainstorm' | 'storyline';
+          title: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          kind: 'storyboard' | 'shotlist' | 'brainstorm' | 'storyline';
+          title?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          kind?: 'storyboard' | 'shotlist' | 'brainstorm' | 'storyline';
+          title?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      board_items: {
+        Row: {
+          id: string;
+          board_id: string;
+          type: 'note' | 'image' | 'file' | 'link' | 'embed';
+          x: number;
+          y: number;
+          w: number;
+          h: number;
+          z: number;
+          rotation: number;
+          content: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          board_id: string;
+          type: 'note' | 'image' | 'file' | 'link' | 'embed';
+          x?: number;
+          y?: number;
+          w?: number;
+          h?: number;
+          z?: number;
+          rotation?: number;
+          content?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          board_id?: string;
+          type?: 'note' | 'image' | 'file' | 'link' | 'embed';
+          x?: number;
+          y?: number;
+          w?: number;
+          h?: number;
+          z?: number;
+          rotation?: number;
+          content?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'board_items_board_id_fkey';
+            columns: ['board_id'];
+            referencedRelation: 'boards';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       profiles: {
         Row: {
           id: string;
