@@ -224,7 +224,7 @@ const actionDescriptions: Record<ActionName, string> = {
   create_event:
     'Propose booking a real Google Calendar event (with a Google Meet link by default). Shows a confirmation card — nothing is booked until the owner clicks Confirm; on Confirm, Google emails invites to any attendees. Times are local wall-clock (YYYY-MM-DDTHH:MM) in time_zone (default America/New_York). Look up attendee emails (list_clients/list_contractors); never guess an address.',
   send_invoice:
-    'Propose SENDING an existing invoice to the client through QuickBooks: on Confirm it syncs the invoice to QuickBooks and QuickBooks emails it with a Pay-Now link. Look the invoice up first (list_invoices) to get its id. Requires QuickBooks connected and the client to have an email — if either is missing, the proposal is declined with the reason, so tell the owner what to fix rather than trying to send. NOTHING sends until the owner clicks Confirm.',
+    'Propose SENDING an existing invoice to the client through QuickBooks. Seaside is estimate-first: on Confirm it creates a QuickBooks ESTIMATE and QuickBooks emails it to the client to approve — once approved, QuickBooks converts the estimate into an invoice (all in QuickBooks). Look the invoice up first (list_invoices) to get its id. Requires QuickBooks connected and the client to have an email — if either is missing, the proposal is declined with the reason, so tell the owner what to fix rather than trying to send. NOTHING sends until the owner clicks Confirm.',
 };
 
 // "create_task" for auto actions; "propose_create_invoice" for gated ones.

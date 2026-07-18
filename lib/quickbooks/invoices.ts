@@ -200,3 +200,109 @@ export async function sendQboInvoice(supabase: DB, invoiceId: string): Promise<{
 
   return { sentTo: email };
 }
+
+// ── Estimate push + send ──────────────────────────────────────────────────────
+// Seaside's flow is estimate-first: PaePae sends an ESTIMATE for the client to
+// approve; QuickBooks converts the accepted estimate into an invoice (in QB).
+// Same customer/item/line shape as an invoice — just the /estimate entity.
+
+export async function pushEstimateToQbo(supabase: DB, invoiceId: string): Promise<{ docNumber: string | null }> {
+  const { data: invoice } = await supabase
+    .from('invoices')
+    .select('id, client_id, qbo_estimate_id, clients ( email )')
+    .eq('id', invoiceId)
+    .single();
+  if (!invoice) throw new Error('That invoice no longer exists.');
+
+  const clientEmail = (invoice.clients as unknown as { email: string | null } | null)?.email ?? null;
+
+  try {
+    const customerId = await ensureQboCustomer(supabase, invoice.client_id);
+    const itemId = await ensureDefaultItem(supabase);
+
+    const { data: lineRows } = await supabase
+      .from('invoice_line_items')
+      .select('label, quantity, rate, amount, position')
+      .eq('invoice_id', invoiceId)
+      .order('position');
+    const lines = (lineRows ?? []) as InvoiceLine[];
+    if (lines.length === 0) throw new Error('This invoice has no line items to send.');
+
+    const Line = lines.map((l) => ({
+      DetailType: 'SalesItemLineDetail' as const,
+      Amount: Number(l.amount),
+      Description: l.label,
+      SalesItemLineDetail: { ItemRef: { value: itemId } },
+    }));
+
+    const body: Record<string, unknown> = {
+      CustomerRef: { value: customerId },
+      Line,
+      ...(clientEmail ? { BillEmail: { Address: clientEmail } } : {}),
+    };
+
+    // Update the existing QB estimate (sparse) if synced before, else create.
+    if (invoice.qbo_estimate_id) {
+      const existing = (await qboFetch(supabase, `/estimate/${invoice.qbo_estimate_id}`)) as {
+        Estimate?: { SyncToken: string };
+      };
+      const syncToken = existing.Estimate?.SyncToken;
+      if (syncToken) {
+        body.Id = invoice.qbo_estimate_id;
+        body.SyncToken = syncToken;
+        body.sparse = true;
+      }
+    }
+
+    const res = (await qboFetch(supabase, '/estimate', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })) as { Estimate?: { Id: string; DocNumber?: string } };
+
+    const qboId = res.Estimate?.Id;
+    if (!qboId) throw new Error('QuickBooks did not return an estimate id.');
+    const docNumber = res.Estimate?.DocNumber ?? null;
+
+    await supabase
+      .from('invoices')
+      .update({
+        qbo_estimate_id: qboId,
+        qbo_estimate_number: docNumber,
+        qbo_synced_at: new Date().toISOString(),
+        qbo_sync_error: null,
+      })
+      .eq('id', invoiceId);
+
+    return { docNumber };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'QuickBooks sync failed.';
+    await supabase.from('invoices').update({ qbo_sync_error: message }).eq('id', invoiceId);
+    throw new Error(message);
+  }
+}
+
+export async function sendQboEstimate(supabase: DB, invoiceId: string): Promise<{ sentTo: string }> {
+  const { data: invoice } = await supabase
+    .from('invoices')
+    .select('id, qbo_estimate_id, clients ( email )')
+    .eq('id', invoiceId)
+    .single();
+  if (!invoice) throw new Error('That invoice no longer exists.');
+  if (!invoice.qbo_estimate_id) throw new Error('Sync this estimate to QuickBooks first, then send it.');
+
+  const email = (invoice.clients as unknown as { email: string | null } | null)?.email ?? null;
+  if (!email) throw new Error('This client has no email address, so QuickBooks can’t send the estimate.');
+
+  await qboFetch(supabase, `/estimate/${invoice.qbo_estimate_id}/send?sendTo=${encodeURIComponent(email)}`, {
+    method: 'POST',
+  });
+
+  // The client has now been sent the estimate to approve — mark the app invoice
+  // sent so it isn't re-sent, and stamp when the estimate went out.
+  await supabase
+    .from('invoices')
+    .update({ status: 'sent', sent_at: new Date().toISOString(), qbo_estimate_sent_at: new Date().toISOString() })
+    .eq('id', invoiceId);
+
+  return { sentTo: email };
+}

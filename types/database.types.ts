@@ -329,6 +329,9 @@ export type Database = {
           qbo_doc_number: string | null;
           qbo_synced_at: string | null;
           qbo_sync_error: string | null;
+          qbo_estimate_id: string | null;
+          qbo_estimate_number: string | null;
+          qbo_estimate_sent_at: string | null;
         };
         Insert: {
           id?: string;
@@ -351,6 +354,9 @@ export type Database = {
           qbo_doc_number?: string | null;
           qbo_synced_at?: string | null;
           qbo_sync_error?: string | null;
+          qbo_estimate_id?: string | null;
+          qbo_estimate_number?: string | null;
+          qbo_estimate_sent_at?: string | null;
         };
         Update: {
           id?: string;
@@ -373,6 +379,9 @@ export type Database = {
           qbo_doc_number?: string | null;
           qbo_synced_at?: string | null;
           qbo_sync_error?: string | null;
+          qbo_estimate_id?: string | null;
+          qbo_estimate_number?: string | null;
+          qbo_estimate_sent_at?: string | null;
         };
         Relationships: [
           {

@@ -20,7 +20,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database.types';
 import { createInvoiceFromQuoteId } from '@/lib/invoices/create';
 import { sendGmail, createCalendarEvent } from '@/lib/google/act';
-import { pushInvoiceToQbo, sendQboInvoice } from '@/lib/quickbooks/invoices';
+import { pushEstimateToQbo, sendQboEstimate } from '@/lib/quickbooks/invoices';
 
 type DB = SupabaseClient<Database>;
 
@@ -240,8 +240,9 @@ export const actionSchemas = {
     with_meet: z.boolean().optional(), // default true — include a Google Meet link
   }),
 
-  // Send an existing invoice to the client THROUGH QuickBooks: syncs it to QB,
-  // then QuickBooks emails it with a Pay-Now link. Always behind a Confirm card.
+  // Send an existing invoice to the client THROUGH QuickBooks as an ESTIMATE:
+  // QB emails it to approve, then converts the accepted estimate into an invoice
+  // (in QB). Always behind a Confirm card.
   send_invoice: z.strictObject({
     invoice_id: uuid,
   }),
@@ -528,7 +529,7 @@ export async function buildProposal(
     if (missing.length > 0) {
       return { ok: false, error: `Can’t send this invoice yet — ${missing.join('; ')}. Fix that, then ask me again.` };
     }
-    lines.push('On Confirm: syncs to QuickBooks, then QuickBooks emails it with a Pay-Now link.');
+    lines.push('On Confirm: creates an estimate in QuickBooks and emails it to the client to approve. Once they approve, QuickBooks turns it into an invoice.');
   }
 
   return { ok: true, proposal: { action, params, summary: lines } };
@@ -801,14 +802,15 @@ export async function executeAction(
       return result.detail;
     }
 
-    // Sends the invoice THROUGH QuickBooks (syncs it, then QB emails the Pay-Now
-    // invoice). Only reachable after the owner's Confirm click (send_invoice is in
+    // Estimate-first: creates a QuickBooks ESTIMATE and emails it for the client
+    // to approve; QuickBooks turns the accepted estimate into an invoice (in QB).
+    // Only reachable after the owner's Confirm click (send_invoice is in
     // CONFIRM_ACTIONS); readiness was checked at propose time in buildProposal.
     case 'send_invoice': {
       const p = parsed.data as ActionParams<'send_invoice'>;
-      await pushInvoiceToQbo(supabase, p.invoice_id);
-      const { sentTo } = await sendQboInvoice(supabase, p.invoice_id);
-      return `Sent the invoice through QuickBooks — it emailed the Pay-Now invoice to ${sentTo}.`;
+      await pushEstimateToQbo(supabase, p.invoice_id);
+      const { sentTo } = await sendQboEstimate(supabase, p.invoice_id);
+      return `Sent the estimate through QuickBooks to ${sentTo} — once they approve it, QuickBooks turns it into an invoice.`;
     }
   }
 }
