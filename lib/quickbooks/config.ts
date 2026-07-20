@@ -22,6 +22,14 @@ export function quickbooksConfigured(): boolean {
 // but blank). Reports presence only — never the values.
 export type EnvVarState = 'ok' | 'missing' | 'empty';
 
+// Diagnostic: the actual env KEY names the server can see that look like ours.
+// Names only — never values. A stray space or lookalike character in the Vercel
+// key renders invisibly in their dashboard but breaks process.env lookup, so
+// printing the real keys (quoted) makes that obvious.
+export function quickbooksEnvKeys(): string[] {
+  return Object.keys(process.env).filter((k) => /QUICK/i.test(k));
+}
+
 export function quickbooksEnvStatus(): Record<'QUICKBOOKS_CLIENT_ID' | 'QUICKBOOKS_CLIENT_SECRET', EnvVarState> {
   const state = (v: string | undefined): EnvVarState =>
     v === undefined ? 'missing' : v.trim() === '' ? 'empty' : 'ok';

@@ -12,11 +12,13 @@ type EnvVarState = 'ok' | 'missing' | 'empty';
 export function QuickbooksSettings({
   configured,
   envStatus,
+  envKeys,
   companyName,
   flag,
 }: {
   configured: boolean; // env credentials present?
   envStatus?: Record<string, EnvVarState>; // which credential is missing/blank (names only)
+  envKeys?: string[]; // actual QUICK* key names the server sees (names only)
   companyName: string | null | undefined; // undefined = not connected
   flag?: string; // ?quickbooks=… status from the OAuth round trip
 }) {
@@ -73,6 +75,12 @@ export function QuickbooksSettings({
                   {envProblems.map((p) => <li key={p}><code>{p}</code></li>)}
                 </ul>
               )}
+              <p className="mt-1 text-xs">
+                Keys the server actually sees:{' '}
+                {envKeys && envKeys.length > 0
+                  ? envKeys.map((k) => <code key={k} className="mr-1">&quot;{k}&quot;</code>)
+                  : <em>none matching QUICK*</em>}
+              </p>
               <p className="mt-1 text-xs">
                 Add them in Vercel (Project → Settings → Environment Variables, scoped to Production),
                 then <strong>redeploy</strong>. For local dev, use <code>.env.local</code>.
