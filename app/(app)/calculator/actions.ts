@@ -94,6 +94,47 @@ export async function saveQuote(_prev: QuoteFormState, formData: FormData): Prom
     if (itemsError) return { error: 'The quote saved but its line items failed. Please reopen and try again.' };
   }
 
+  // Deliverables typed in the calculator sync into the PROJECT's deliverables
+  // list — one source of truth, since the project view AND the contract builder
+  // both read it. Upsert by title; never delete, because a deliverable already
+  // on the project may be underway (CLAUDE.md #4).
+  const projectId = values.project_id;
+  if (projectId) {
+    let list: { title: string; due: string | null }[] = [];
+    try {
+      const parsed = JSON.parse(String(formData.get('deliverables_json') ?? '[]'));
+      if (Array.isArray(parsed)) {
+        list = parsed
+          .map((d) => ({ title: String(d?.title ?? '').trim(), due: (d?.due as string | null) || null }))
+          .filter((d) => d.title !== '');
+      }
+    } catch { /* malformed — skip the sync rather than fail the save */ }
+
+    if (list.length > 0) {
+      const { data: existing } = await supabase
+        .from('deliverables')
+        .select('id, title')
+        .eq('project_id', projectId);
+      const byTitle = new Map((existing ?? []).map((d) => [d.title.trim().toLowerCase(), d.id]));
+
+      const toInsert = list.filter((d) => !byTitle.has(d.title.toLowerCase()));
+      if (toInsert.length > 0) {
+        await supabase.from('deliverables').insert(
+          toInsert.map((d, i) => ({
+            project_id: projectId,
+            title: d.title,
+            due_date: d.due,
+            position: (existing?.length ?? 0) + i,
+          })),
+        );
+      }
+      for (const d of list) {
+        const existingId = byTitle.get(d.title.toLowerCase());
+        if (existingId) await supabase.from('deliverables').update({ due_date: d.due }).eq('id', existingId);
+      }
+    }
+  }
+
   revalidatePath('/calculator');
   revalidatePath('/dashboard');
   revalidatePath(`/clients/${values.client_id}`);
@@ -135,6 +176,34 @@ export async function quickCreateClient(input: {
   revalidatePath('/calculator');
   revalidatePath('/clients');
   return { ok: true, client: data };
+}
+
+// Quick-add a project straight from the calculator, so a quote can always be
+// attached to one (contracts live under a project). Mirrors quickCreateClient.
+export async function quickCreateProject(input: {
+  title: string;
+  client_id: string;
+}): Promise<
+  | { ok: true; project: { id: string; title: string; client_id: string } }
+  | { ok: false; error: string }
+> {
+  const title = (input?.title ?? '').trim();
+  const clientId = (input?.client_id ?? '').trim();
+  if (!clientId) return { ok: false, error: 'Choose a client first.' };
+  if (!title) return { ok: false, error: 'Project name is required.' };
+  if (title.length > 200) return { ok: false, error: 'That name is too long.' };
+
+  const supabase = await createSupabaseServer();
+  const { data, error } = await supabase
+    .from('projects')
+    .insert({ title, client_id: clientId, status: 'idea_inquiry' })
+    .select('id, title, client_id')
+    .single();
+  if (error || !data) return { ok: false, error: 'Could not add the project. Please try again.' };
+
+  revalidatePath('/calculator');
+  revalidatePath('/projects');
+  return { ok: true, project: data };
 }
 
 // Flip a quote between draft / sent / accepted / declined.

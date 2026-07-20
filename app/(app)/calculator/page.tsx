@@ -49,6 +49,9 @@ export default async function CalculatorPage({
   // Edit mode: restore the saved picker selections.
   let initial: QuoteInitial | undefined;
   let legacyQuote = false;
+  // Deliverables live on the project, so reopening a quote shows the ones
+  // already there (edit them here and they sync back on save).
+  let initialDeliverables: { title: string; due: string | null }[] = [];
   if (editId) {
     const { data: q } = await supabase
       .from('quotes')
@@ -59,6 +62,15 @@ export default async function CalculatorPage({
       const state = (q.calculator_state as CalculatorSelections | null) ?? null;
       legacyQuote = !state;
       initial = { id: q.id, title: q.title, client_id: q.client_id, project_id: q.project_id, notes: q.notes, selections: state };
+
+      if (q.project_id) {
+        const { data: dels } = await supabase
+          .from('deliverables')
+          .select('title, due_date')
+          .eq('project_id', q.project_id)
+          .order('position');
+        initialDeliverables = (dels ?? []).map((d) => ({ title: d.title, due: d.due_date }));
+      }
     }
   }
 
@@ -110,6 +122,7 @@ export default async function CalculatorPage({
             config={config}
             initial={initial}
             justSaved={saved === '1'}
+            initialDeliverables={initialDeliverables}
           />
         )}
 

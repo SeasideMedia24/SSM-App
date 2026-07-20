@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { saveQuote, quickCreateClient, type QuoteFormState } from '@/app/(app)/calculator/actions';
+import { saveQuote, quickCreateClient, quickCreateProject, type QuoteFormState } from '@/app/(app)/calculator/actions';
 import {
   computeQuote, emptySelections, RENTAL_LABELS, DISCOUNT_LABELS,
   type CalculatorSelections, type RoleRates, type PageService, type PricingConfig,
@@ -22,6 +22,9 @@ const field =
 
 export type ClientOption = { id: string; name: string; company: string | null };
 export type ProjectOption = { id: string; title: string; client_id: string };
+// A deliverable typed while quoting. On save these sync into the project's
+// Deliverables list, which is what the contract autofills from.
+export type QuoteDeliverable = { title: string; due: string | null };
 
 export type QuoteInitial = {
   id: string;
@@ -53,7 +56,7 @@ const DRAFT_KEY = 'ssm-calculator-draft';
 type Draft = { clientId: string; projectId: string; title: string; selections: CalculatorSelections };
 
 export function ProductionCalculator({
-  clients, projects, roles, services, config, initial, justSaved = false,
+  clients, projects, roles, services, config, initial, justSaved = false, initialDeliverables = [],
 }: {
   clients: ClientOption[];
   projects: ProjectOption[];
@@ -62,14 +65,26 @@ export function ProductionCalculator({
   config: PricingConfig;
   initial?: QuoteInitial;
   justSaved?: boolean;
+  initialDeliverables?: QuoteDeliverable[];
 }) {
   const editing = !!initial;
   const [state, action] = useActionState<QuoteFormState, FormData>(saveQuote, { error: null });
   const [clientId, setClientId] = useState(initial?.client_id ?? '');
   const [projectId, setProjectId] = useState(initial?.project_id ?? '');
   const [title, setTitle] = useState(initial?.title ?? '');
-  // Clients are seeded from the server but can grow via quick-add below.
+  // Clients and projects are seeded from the server but can grow via quick-add.
   const [clientList, setClientList] = useState<ClientOption[]>(clients);
+  const [projectList, setProjectList] = useState<ProjectOption[]>(projects);
+  // Deliverables for this job — synced into the project on save, and what the
+  // contract autofills from.
+  const [deliverables, setDeliverables] = useState<QuoteDeliverable[]>(
+    initialDeliverables.length > 0 ? initialDeliverables : [{ title: '', due: null }],
+  );
+  const setDeliverable = (i: number, patch: Partial<QuoteDeliverable>) =>
+    setDeliverables((prev) => prev.map((d, j) => (j === i ? { ...d, ...patch } : d)));
+  const cleanDeliverables = deliverables
+    .map((d) => ({ title: d.title.trim(), due: d.due || null }))
+    .filter((d) => d.title !== '');
   const [s, setS] = useState<CalculatorSelections>(() => initial?.selections ?? emptySelections());
 
   // Draft persistence (new quotes only). We hydrate after mount — localStorage
@@ -106,7 +121,7 @@ export function ProductionCalculator({
     } catch { /* quota/private mode — non-fatal */ }
   }, [editing, hydrated, clientId, projectId, title, s]);
 
-  const clientProjects = useMemo(() => projects.filter((p) => p.client_id === clientId), [projects, clientId]);
+  const clientProjects = useMemo(() => projectList.filter((p) => p.client_id === clientId), [projectList, clientId]);
   const preServices = services.filter((x) => x.phase === 'pre');
   const postServices = services.filter((x) => x.phase === 'post');
 
@@ -155,6 +170,7 @@ export function ProductionCalculator({
     <form action={action} className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[1fr_18rem]">
       {initial && <input type="hidden" name="id" value={initial.id} />}
       <input type="hidden" name="selections" value={JSON.stringify(s)} />
+      <input type="hidden" name="deliverables_json" value={JSON.stringify(cleanDeliverables)} />
 
       <div className="flex flex-col gap-6">
         {/* ① Who this quote is for */}
@@ -181,11 +197,18 @@ export function ProductionCalculator({
                 }}
               />
             </Labeled>
-            <Labeled label="Project (optional)">
+            <Labeled label="Project">
               <select name="project_id" value={projectId} onChange={(e) => setProjectId(e.target.value)} className={field} disabled={!clientId}>
                 <option value="">No project</option>
                 {clientProjects.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
               </select>
+              <QuickAddProject
+                clientId={clientId}
+                onCreated={(p) => {
+                  setProjectList((prev) => [...prev, p].sort((a, b) => a.title.localeCompare(b.title)));
+                  setProjectId(p.id);
+                }}
+              />
             </Labeled>
             <Labeled label="Quote title" required>
               <input name="title" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Brand film — production" className={field} />
@@ -339,6 +362,50 @@ export function ProductionCalculator({
           </Card>
         </div>
 
+        {/* Deliverables — saved onto the project; the contract autofills from these */}
+        <Card
+          title="Deliverables"
+          hint={projectId
+            ? 'Saved onto the project — your contract autofills from these.'
+            : 'Pick a project above and these save with the job (and autofill the contract).'}
+          onReset={() => setDeliverables([{ title: '', due: null }])}
+        >
+          <div className="flex flex-col gap-2">
+            {deliverables.map((d, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <input
+                  value={d.title}
+                  onChange={(e) => setDeliverable(i, { title: e.target.value })}
+                  placeholder="e.g. 60-second brand film"
+                  className={`${field} flex-1`}
+                />
+                <input
+                  type="date"
+                  value={d.due ?? ''}
+                  onChange={(e) => setDeliverable(i, { due: e.target.value || null })}
+                  aria-label="Deliverable due date"
+                  className={`${field} w-[9.5rem]`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setDeliverables((prev) => prev.filter((_, j) => j !== i))}
+                  aria-label="Remove deliverable"
+                  className="mt-2 px-1 text-slate-400 transition-colors hover:text-red-600"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setDeliverables((prev) => [...prev, { title: '', due: null }])}
+              className="self-start text-xs font-medium text-sea hover:underline"
+            >
+              + Add deliverable
+            </button>
+          </div>
+        </Card>
+
         <Card title="Notes">
           <textarea name="notes" rows={3} defaultValue={initial?.notes ?? ''} placeholder="Terms, assumptions, anything the client should know…" className={`${field} w-full`} />
         </Card>
@@ -467,6 +534,60 @@ function QuickAddClient({ onCreated }: { onCreated: (c: ClientOption) => void })
           className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-60"
         >
           {pending ? 'Adding…' : 'Add client'}
+        </button>
+        <button type="button" onClick={() => { setOpen(false); setError(null); }} className="text-xs text-slate-500 hover:text-slate-700">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Quick-add a project without leaving the calculator, so a quote can always be
+// attached to one (contracts live under a project). Mirrors QuickAddClient —
+// not a nested <form>; it calls the server action directly.
+function QuickAddProject({ clientId, onCreated }: { clientId: string; onCreated: (p: ProjectOption) => void }) {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  if (!clientId) return null; // a project needs a client first
+
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="mt-1.5 self-start text-xs font-medium text-sea hover:underline">
+        + New project
+      </button>
+    );
+  }
+
+  function submit() {
+    setError(null);
+    start(async () => {
+      const res = await quickCreateProject({ title, client_id: clientId });
+      if (res.ok) {
+        onCreated(res.project);
+        setOpen(false);
+        setTitle('');
+      } else {
+        setError(res.error);
+      }
+    });
+  }
+
+  return (
+    <div className="mt-2 flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Project name" className={field} aria-label="New project name" />
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          disabled={pending || !title.trim()}
+          onClick={submit}
+          className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-60"
+        >
+          {pending ? 'Adding…' : 'Add project'}
         </button>
         <button type="button" onClick={() => { setOpen(false); setError(null); }} className="text-xs text-slate-500 hover:text-slate-700">
           Cancel
