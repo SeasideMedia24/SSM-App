@@ -57,6 +57,8 @@ export async function updateContractTerms(_prev: ContractFormState, f: FormData)
 
   const effRaw = String(f.get('effective_date') ?? '').trim();
   const effective_date = /^\d{4}-\d{2}-\d{2}$/.test(effRaw) ? effRaw : null;
+  const prodRaw = String(f.get('production_date') ?? '').trim();
+  const production_date = /^\d{4}-\d{2}-\d{2}$/.test(prodRaw) ? prodRaw : null;
 
   const deposit_amount = num(f.get('deposit_amount'));
   const production_amount = num(f.get('production_amount'));
@@ -82,6 +84,7 @@ export async function updateContractTerms(_prev: ContractFormState, f: FormData)
     .update({
       title,
       effective_date,
+      production_date,
       deposit_amount,
       production_amount,
       delivery_amount,
@@ -144,6 +147,7 @@ export async function sendContractForSignature(contractId: string): Promise<Send
     deliverables,
     revisionRounds: c.revision_rounds,
     revisionPct: c.revision_pct,
+    productionDate: c.production_date,
   };
 
   const token = crypto.randomUUID();

@@ -62,6 +62,7 @@ export default async function ContractEditorPage({ params }: { params: Promise<{
           signer_title: c.signer_title,
           signed_at: c.signed_at,
           deposit_invoice_id: c.deposit_invoice_id,
+          production_date: c.production_date,
         }}
         clientName={client?.name ?? ''}
         clientCompany={client?.company ?? null}

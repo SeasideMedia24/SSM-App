@@ -842,6 +842,7 @@ export type Database = {
           signed_at: string | null;
           signer_ip: string | null;
           deposit_invoice_id: string | null;
+          production_date: string | null;
         };
         Insert: {
           id?: string;
@@ -869,6 +870,7 @@ export type Database = {
           signed_at?: string | null;
           signer_ip?: string | null;
           deposit_invoice_id?: string | null;
+          production_date?: string | null;
         };
         Update: {
           id?: string;
@@ -896,6 +898,7 @@ export type Database = {
           signed_at?: string | null;
           signer_ip?: string | null;
           deposit_invoice_id?: string | null;
+          production_date?: string | null;
         };
         Relationships: [
           {

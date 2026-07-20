@@ -5,6 +5,7 @@
 // confirm-before-delete. Kept together so they share the small primitives below.
 
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
+import Link from 'next/link';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { useUndo } from '@/components/undo/undo-provider';
@@ -196,6 +197,7 @@ function ContractRow({ c, projectId }: { c: Contract; projectId: string }) {
       <span className="flex-1 text-sm text-ink">{c.title}</span>
       {c.amount != null && <span className="text-sm text-slate-600">{money(c.amount)}</span>}
       {fmtDate(c.signed_date) && <span className="text-[11px] text-slate-400">{fmtDate(c.signed_date)}</span>}
+      <Link href={`/contracts/${c.id}`} className="text-xs font-medium text-sea hover:underline">Open</Link>
       <DeleteInline action={deleteContract} id={c.id} projectId={projectId} />
     </li>
   );

@@ -24,6 +24,7 @@ export type ContractTerms = {
   deliverables: Deliverable[];
   revisionRounds: number;
   revisionPct: number;
+  productionDate?: string | null; // ISO 'YYYY-MM-DD'; blank → "TBD by Producer"
 };
 
 // Deliverables are stored as jsonb and may include older string-only rows —
@@ -85,7 +86,7 @@ ${deliverables}
 
 **2.1 Missed Payments** — The final payment is required on final delivery of the product. For any late payments on any portion of the project, the Client may be charged, at the Producer's discretion, 10% on unpaid amounts until paid, compounded monthly.
 
-**3. Date(s)** — TBD by Producer.
+**3. Date(s)** — ${t.productionDate ? `Production is scheduled for **${longDate(t.productionDate)}**.` : 'TBD by Producer.'}
 
 **3.1 Contingency Day(s)** — A contingency day is any day where a scheduled shoot has been prevented from occurring due to circumstances beyond the control of the production company (weather; injury, illness, or absence of client-supplied elements; force majeure; client-insured re-shoots). The Producer will quote a maximum "not to exceed" contingency day cost, which does not include premiums for crew or suppliers on weekends, holidays, or premium days.
 

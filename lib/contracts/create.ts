@@ -26,6 +26,18 @@ export async function buildContractFromQuote(
     throw new Error('Attach this quote to a project first, then generate the contract.');
   }
 
+  // Reuse an existing unsigned contract for this quote instead of piling up a new
+  // draft every time "Create contract" is clicked. A signed one is left alone.
+  const { data: existing } = await supabase
+    .from('contracts')
+    .select('id, project_id')
+    .eq('quote_id', quote.id)
+    .neq('status', 'signed')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (existing) return existing;
+
   // Seed the contract's deliverable lines from the project's deliverables. The
   // owner edits this snapshot in the editor; it's independent of the live table.
   const { data: deliverables } = await supabase

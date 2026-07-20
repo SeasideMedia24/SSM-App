@@ -39,6 +39,7 @@ export type ContractEditorData = {
   signer_title: string | null;
   signed_at: string | null;
   deposit_invoice_id: string | null;
+  production_date: string | null;
 };
 
 // Minimal markdown styling (no typography plugin) — enough for a legible contract.
@@ -70,6 +71,7 @@ export function ContractEditor({
   const [delivery, setDelivery] = useState(contract.delivery_amount?.toString() ?? '');
   const [rounds, setRounds] = useState(contract.revision_rounds?.toString() ?? '2');
   const [pct, setPct] = useState(contract.revision_pct?.toString() ?? '100');
+  const [productionDate, setProductionDate] = useState(contract.production_date ?? '');
   const [deliverables, setDeliverables] = useState<Deliverable[]>(
     contract.deliverables_snapshot.length > 0 ? contract.deliverables_snapshot : [{ title: '', due: null }],
   );
@@ -106,8 +108,9 @@ export function ContractEditor({
     effectiveDate: effectiveDate || null,
     depositAmount: num(deposit) ?? 0, productionAmount: num(production) ?? 0, deliveryAmount: num(delivery) ?? 0,
     deliverables: cleanDeliverables, revisionRounds: num(rounds) ?? 0, revisionPct: num(pct) ?? 0,
+    productionDate: productionDate || null,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [clientName, clientCompany, projectTitle, effectiveDate, deposit, production, delivery, deliverables, rounds, pct]);
+  }), [clientName, clientCompany, projectTitle, effectiveDate, deposit, production, delivery, deliverables, rounds, pct, productionDate]);
 
   const previewMd = signed && contract.body_md ? contract.body_md : renderContract(preview);
 
@@ -121,6 +124,7 @@ export function ContractEditor({
     fd.set('delivery_amount', delivery);
     fd.set('revision_rounds', rounds);
     fd.set('revision_pct', pct);
+    fd.set('production_date', productionDate);
     fd.set('deliverables_json', JSON.stringify(cleanDeliverables));
     return fd;
   }
@@ -163,9 +167,9 @@ export function ContractEditor({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[22rem_1fr]">
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[24rem_minmax(0,1fr)]">
       {/* ── Left: editable terms ── */}
-      <div className="flex flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-4">
         {signed && (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
             Signed by {contract.signer_name}{contract.signer_title ? `, ${contract.signer_title}` : ''} on {fmtDate(contract.signed_at?.slice(0, 10) ?? null)}. The terms are locked.
@@ -177,10 +181,16 @@ export function ContractEditor({
             Contract title
             <input value={title} onChange={(e) => setTitle(e.target.value)} className={field} />
           </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
-            Effective date
-            <input type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} className={field} />
-          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
+              Effective date
+              <input type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} className={field} />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
+              Production date <span className="font-normal text-slate-400">(optional)</span>
+              <input type="date" value={productionDate} onChange={(e) => setProductionDate(e.target.value)} className={field} />
+            </label>
+          </div>
 
           <div className="grid grid-cols-3 gap-2">
             <Money label="Deposit" value={deposit} onChange={setDeposit} />
@@ -301,9 +311,14 @@ export function ContractEditor({
         )}
       </div>
 
-      {/* ── Right: live document preview ── */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={md}>{previewMd}</ReactMarkdown>
+      {/* ── Right: live document preview (contained + scrolls, sticky on wide screens) ── */}
+      <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:sticky lg:top-6">
+        <p className="border-b border-slate-100 bg-slate-50 px-6 py-2 text-xs font-medium uppercase tracking-wide text-slate-400">
+          Live preview
+        </p>
+        <div className="max-h-[calc(100vh-8rem)] overflow-y-auto px-8 py-6">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={md}>{previewMd}</ReactMarkdown>
+        </div>
       </div>
     </div>
   );

@@ -94,40 +94,49 @@ export async function saveQuote(_prev: QuoteFormState, formData: FormData): Prom
     if (itemsError) return { error: 'The quote saved but its line items failed. Please reopen and try again.' };
   }
 
-  // Deliverables typed in the calculator sync into the PROJECT's deliverables
-  // list — one source of truth, since the project view AND the contract builder
-  // both read it. Upsert by title; never delete, because a deliverable already
-  // on the project may be underway (CLAUDE.md #4).
+  // Deliverables typed in the calculator ARE the project's deliverables — one
+  // source of truth, since the project view and the contract builder both read
+  // this list. Reconcile by title: add new ones, update due dates on matches,
+  // and remove ones the owner deleted here. (Editing a quote pre-loads the
+  // project's deliverables, so the list is WYSIWYG — a deletion is intentional.)
+  // Guard: an EMPTY list never wipes the project, so a quote saved without
+  // touching deliverables can't clear them by accident.
   const projectId = values.project_id;
   if (projectId) {
     let list: { title: string; due: string | null }[] = [];
+    let hadField = false;
     try {
-      const parsed = JSON.parse(String(formData.get('deliverables_json') ?? '[]'));
+      const raw = formData.get('deliverables_json');
+      hadField = raw != null;
+      const parsed = JSON.parse(String(raw ?? '[]'));
       if (Array.isArray(parsed)) {
         list = parsed
           .map((d) => ({ title: String(d?.title ?? '').trim(), due: (d?.due as string | null) || null }))
           .filter((d) => d.title !== '');
       }
-    } catch { /* malformed — skip the sync rather than fail the save */ }
+    } catch { hadField = false; /* malformed — skip the sync rather than fail the save */ }
 
-    if (list.length > 0) {
+    if (hadField && list.length > 0) {
       const { data: existing } = await supabase
         .from('deliverables')
         .select('id, title')
         .eq('project_id', projectId);
-      const byTitle = new Map((existing ?? []).map((d) => [d.title.trim().toLowerCase(), d.id]));
+      const rows = existing ?? [];
+      const wanted = new Map(list.map((d) => [d.title.toLowerCase(), d]));
+      const byTitle = new Map(rows.map((d) => [d.title.trim().toLowerCase(), d.id]));
 
+      // Remove deliverables no longer in the list (status is lost, as intended).
+      const toDelete = rows.filter((d) => !wanted.has(d.title.trim().toLowerCase())).map((d) => d.id);
+      if (toDelete.length > 0) await supabase.from('deliverables').delete().in('id', toDelete);
+
+      // Add the new ones.
       const toInsert = list.filter((d) => !byTitle.has(d.title.toLowerCase()));
       if (toInsert.length > 0) {
         await supabase.from('deliverables').insert(
-          toInsert.map((d, i) => ({
-            project_id: projectId,
-            title: d.title,
-            due_date: d.due,
-            position: (existing?.length ?? 0) + i,
-          })),
+          toInsert.map((d, i) => ({ project_id: projectId, title: d.title, due_date: d.due, position: rows.length + i })),
         );
       }
+      // Update due dates on the ones that stayed.
       for (const d of list) {
         const existingId = byTitle.get(d.title.toLowerCase());
         if (existingId) await supabase.from('deliverables').update({ due_date: d.due }).eq('id', existingId);

@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { saveQuote, quickCreateClient, quickCreateProject, type QuoteFormState } from '@/app/(app)/calculator/actions';
+import { createContractFromQuote } from '@/app/(app)/contracts/actions';
 import {
   computeQuote, emptySelections, RENTAL_LABELS, DISCOUNT_LABELS,
   type CalculatorSelections, type RoleRates, type PageService, type PricingConfig,
@@ -436,7 +437,22 @@ export function ProductionCalculator({
         <div className="mt-2 flex flex-col gap-2">
           <SaveButton editing={!!initial} />
           {initial && (
-            <a href="/calculator" className="text-center text-sm text-slate-500 hover:text-slate-700">Cancel editing</a>
+            <>
+              {/* Jump straight to the prefilled contract for this saved quote.
+                  Uses formAction to post the SAME form to a different action;
+                  works on the already-saved quote (save first if you've edited). */}
+              <button
+                type="submit"
+                name="quote_id"
+                value={initial.id}
+                formAction={createContractFromQuote}
+                formNoValidate
+                className="rounded-xl border border-teal/60 px-5 py-2.5 text-sm font-semibold text-sea transition hover:bg-teal/5"
+              >
+                Create contract
+              </button>
+              <a href="/calculator" className="text-center text-sm text-slate-500 hover:text-slate-700">Cancel editing</a>
+            </>
           )}
           {!initial && (
             <ResetAllButton
