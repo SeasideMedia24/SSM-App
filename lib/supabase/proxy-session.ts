@@ -15,7 +15,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 // public onboarding forms, shared quote/invoice/contract links, the client
 // portal, and the set-password page an invited team member lands on (it checks
 // its own session).
-const PUBLIC_PREFIXES = ['/login', '/auth', '/onboard', '/contractor-onboard', '/quote', '/invoice', '/contract', '/portal', '/welcome'];
+const PUBLIC_PREFIXES = ['/login', '/auth', '/onboard', '/contractor-onboard', '/quote', '/invoice', '/contract', '/portal', '/welcome', '/legal'];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
