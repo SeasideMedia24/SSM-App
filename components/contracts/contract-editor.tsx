@@ -70,7 +70,7 @@ export function ContractEditor({
   const [production, setProduction] = useState(contract.production_amount?.toString() ?? '');
   const [delivery, setDelivery] = useState(contract.delivery_amount?.toString() ?? '');
   const [rounds, setRounds] = useState(contract.revision_rounds?.toString() ?? '2');
-  const [pct, setPct] = useState(contract.revision_pct?.toString() ?? '100');
+  const [pct, setPct] = useState(contract.revision_pct?.toString() ?? '10');
   const [productionDate, setProductionDate] = useState(contract.production_date ?? '');
   const [deliverables, setDeliverables] = useState<Deliverable[]>(
     contract.deliverables_snapshot.length > 0 ? contract.deliverables_snapshot : [{ title: '', due: null }],
@@ -181,13 +181,13 @@ export function ContractEditor({
             Contract title
             <input value={title} onChange={(e) => setTitle(e.target.value)} className={field} />
           </label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 items-end gap-2">
             <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
-              Effective date
+              <span className="truncate whitespace-nowrap">Effective date</span>
               <input type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} className={field} />
             </label>
             <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
-              Production date <span className="font-normal text-slate-400">(optional)</span>
+              <span className="truncate whitespace-nowrap">Production date <span className="font-normal text-slate-400">(optional)</span></span>
               <input type="date" value={productionDate} onChange={(e) => setProductionDate(e.target.value)} className={field} />
             </label>
           </div>

@@ -34,12 +34,22 @@ export default async function ContractEditorPage({ params }: { params: Promise<{
         action={<DeleteContractButton contractId={c.id} projectId={c.project_id} />}
       />
 
-      <div className="-mt-3 mb-5 flex flex-wrap items-center gap-3 text-sm">
-        <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${meta.pill}`}>{meta.label}</span>
-        {project && <Link href={`/projects/${project.id}`} className="text-slate-500 hover:text-sea hover:underline">{project.title}</Link>}
-        {client && <Link href={`/clients/${client.id}`} className="text-slate-600 hover:text-sea hover:underline">{client.name}</Link>}
+      <div className="-mt-3 mb-5 flex flex-wrap items-center gap-2 text-sm">
+        <span className={`rounded-md px-2 py-1 text-xs font-medium ${meta.pill}`}>{meta.label}</span>
+        {project && (
+          <Link href={`/projects/${project.id}`} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-teal hover:text-sea">
+            {project.title}
+          </Link>
+        )}
+        {client && (
+          <Link href={`/clients/${client.id}`} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-teal hover:text-sea">
+            {client.name}
+          </Link>
+        )}
         {c.quote_id && (
-          <Link href={`/calculator?quote=${c.quote_id}`} className="text-xs text-slate-400 hover:text-sea hover:underline">from quote</Link>
+          <Link href={`/calculator?quote=${c.quote_id}`} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-400 transition-colors hover:border-teal hover:text-sea">
+            from quote
+          </Link>
         )}
       </div>
 

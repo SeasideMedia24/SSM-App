@@ -154,9 +154,9 @@ export async function saveQuote(_prev: QuoteFormState, formData: FormData): Prom
     revalidatePath(`/projects/${values.project_id}`);
     revalidatePath('/projects/budget');
   }
-  // ?saved=1 lets the calculator confirm the save and clear its local draft so
-  // the next quote starts from a clean slate.
-  redirect('/calculator?saved=1');
+  // Reopen the SAME quote after saving (not a blank calculator) so the owner can
+  // immediately hit "Create contract". ?saved=1 shows the confirmation.
+  redirect(`/calculator?quote=${quoteId}&saved=1`);
 }
 
 // Quick-add a client straight from the calculator, for when someone calls

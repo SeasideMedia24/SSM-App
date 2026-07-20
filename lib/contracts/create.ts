@@ -63,7 +63,7 @@ export async function buildContractFromQuote(
       production_amount: production,
       delivery_amount: delivery,
       revision_rounds: 2,
-      revision_pct: 100,
+      revision_pct: 10,
       deliverables_snapshot: (deliverables ?? []).map((d) => ({ title: d.title, due: d.due_date })),
     })
     .select('id, project_id')
