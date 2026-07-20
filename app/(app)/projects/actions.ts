@@ -61,10 +61,11 @@ export async function saveProject(
     if (error || !data) return { error: 'Could not create the project. Please try again.' };
     savedId = data.id;
 
-    // Seed template rows matched to the chosen type.
+    // Seed template rows matched to the chosen type. Deliverables are NOT
+    // templated — they come from the quote, so the list stays exactly what the
+    // owner entered.
     const rows = templateRows(savedId, values.project_type ?? undefined);
     await Promise.all([
-      supabase.from('deliverables').insert(rows.deliverables),
       supabase.from('milestones').insert(rows.milestones),
       supabase.from('budget_lines').insert(rows.budget_lines),
     ]);

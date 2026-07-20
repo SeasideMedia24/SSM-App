@@ -123,7 +123,6 @@ export async function submitOnboarding(_prev: OnboardState, formData: FormData):
       projectId = project.id;
       const rows = templateRows(projectId, projectType ?? undefined);
       await Promise.all([
-        admin.from('deliverables').insert(rows.deliverables),
         admin.from('milestones').insert(rows.milestones),
         admin.from('budget_lines').insert(rows.budget_lines),
       ]);
