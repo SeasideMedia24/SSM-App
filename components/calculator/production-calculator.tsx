@@ -10,7 +10,8 @@ import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { saveQuote, quickCreateClient, quickCreateProject, type QuoteFormState } from '@/app/(app)/calculator/actions';
-import { createContractFromQuote } from '@/app/(app)/contracts/actions';
+import { generateContractForQuote } from '@/app/(app)/contracts/actions';
+import { useRouter } from 'next/navigation';
 import {
   computeQuote, emptySelections, RENTAL_LABELS, DISCOUNT_LABELS,
   type CalculatorSelections, type RoleRates, type PageService, type PricingConfig,
@@ -76,6 +77,10 @@ export function ProductionCalculator({
   // Clients and projects are seeded from the server but can grow via quick-add.
   const [clientList, setClientList] = useState<ClientOption[]>(clients);
   const [projectList, setProjectList] = useState<ProjectOption[]>(projects);
+  // "Create contract" generates (or reuses) the contract, then navigates to it.
+  const router = useRouter();
+  const [contractPending, startContract] = useTransition();
+  const [contractError, setContractError] = useState<string | null>(null);
   // Deliverables for this job — synced into the project on save, and what the
   // contract autofills from.
   const [deliverables, setDeliverables] = useState<QuoteDeliverable[]>(
@@ -438,19 +443,26 @@ export function ProductionCalculator({
           <SaveButton editing={!!initial} />
           {initial && (
             <>
-              {/* Jump straight to the prefilled contract for this saved quote.
-                  Uses formAction to post the SAME form to a different action;
-                  works on the already-saved quote (save first if you've edited). */}
+              {/* Generate (or reuse) the contract for this saved quote, then go
+                  to it. A plain button + router.push — not a form submit — so it
+                  never collides with the save action. Uses the last SAVED quote;
+                  save first if you've just edited. */}
               <button
-                type="submit"
-                name="quote_id"
-                value={initial.id}
-                formAction={createContractFromQuote}
-                formNoValidate
-                className="rounded-xl border border-teal/60 px-5 py-2.5 text-sm font-semibold text-sea transition hover:bg-teal/5"
+                type="button"
+                disabled={contractPending}
+                onClick={() =>
+                  startContract(async () => {
+                    setContractError(null);
+                    const res = await generateContractForQuote(initial.id);
+                    if (res.ok) router.push(`/contracts/${res.id}`);
+                    else setContractError(res.error);
+                  })
+                }
+                className="rounded-xl border border-teal/60 px-5 py-2.5 text-sm font-semibold text-sea transition hover:bg-teal/5 disabled:opacity-60"
               >
-                Create contract
+                {contractPending ? 'Opening…' : 'Create contract'}
               </button>
+              {contractError && <p className="text-center text-xs text-red-600">{contractError}</p>}
               <a href="/calculator" className="text-center text-sm text-slate-500 hover:text-slate-700">Cancel editing</a>
             </>
           )}

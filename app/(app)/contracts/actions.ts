@@ -38,6 +38,25 @@ export async function createContractFromQuote(formData: FormData) {
   redirect(`/contracts/${contract.id}`);
 }
 
+// Same as createContractFromQuote but RETURNS the id instead of redirecting, so
+// a client button can navigate itself (router.push). Used by the calculator's
+// "Create contract" button, where a form `formAction` override proved unreliable
+// inside the big save form.
+export async function generateContractForQuote(
+  quoteId: string,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  if (!quoteId) return { ok: false, error: 'Missing quote.' };
+  const supabase = await createSupabaseServer();
+  try {
+    const contract = await buildContractFromQuote(supabase, quoteId);
+    revalidatePath('/projects/contracts');
+    revalidatePath(`/projects/${contract.project_id}`);
+    return { ok: true, id: contract.id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Could not generate the contract.' };
+  }
+}
+
 const num = (v: FormDataEntryValue | null): number | null => {
   const s = String(v ?? '').trim();
   if (s === '') return null;
