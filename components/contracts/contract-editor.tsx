@@ -167,7 +167,7 @@ export function ContractEditor({
   }
 
   return (
-    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[24rem_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[24rem_minmax(0,1fr)] lg:gap-12">
       {/* ── Left: editable terms ── */}
       <div className="flex min-w-0 flex-col gap-4">
         {signed && (
