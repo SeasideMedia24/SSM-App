@@ -7,15 +7,23 @@
 import { useState, useTransition } from 'react';
 import { disconnectQuickbooks } from '@/app/(app)/settings/quickbooks-actions';
 
+type EnvVarState = 'ok' | 'missing' | 'empty';
+
 export function QuickbooksSettings({
   configured,
+  envStatus,
   companyName,
   flag,
 }: {
   configured: boolean; // env credentials present?
+  envStatus?: Record<string, EnvVarState>; // which credential is missing/blank (names only)
   companyName: string | null | undefined; // undefined = not connected
   flag?: string; // ?quickbooks=… status from the OAuth round trip
 }) {
+  // Spell out exactly what the SERVER sees, so a bad deploy is obvious.
+  const envProblems = Object.entries(envStatus ?? {})
+    .filter(([, s]) => s !== 'ok')
+    .map(([name, s]) => `${name}: ${s === 'empty' ? 'present but blank' : 'not found'}`);
   const [pending, start] = useTransition();
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const connected = companyName !== undefined;
@@ -40,7 +48,7 @@ export function QuickbooksSettings({
       {flag === 'missing-env' && (
         <p className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
           QuickBooks credentials aren’t set up yet — add QUICKBOOKS_CLIENT_ID and QUICKBOOKS_CLIENT_SECRET
-          to .env.local (see .env.local.example) and Vercel, then try again.
+          in Vercel (Project → Settings → Environment Variables) and redeploy, then try again.
         </p>
       )}
 
@@ -58,9 +66,18 @@ export function QuickbooksSettings({
               Connect QuickBooks
             </a>
           ) : (
-            <span className="rounded-xl bg-slate-100 px-4 py-2.5 text-sm text-slate-500">
-              Waiting on QuickBooks credentials (.env.local)
-            </span>
+            <div className="max-w-sm rounded-xl bg-slate-100 px-4 py-2.5 text-sm text-slate-500">
+              <p>Waiting on QuickBooks credentials.</p>
+              {envProblems.length > 0 && (
+                <ul className="mt-1 list-disc pl-4 text-xs">
+                  {envProblems.map((p) => <li key={p}><code>{p}</code></li>)}
+                </ul>
+              )}
+              <p className="mt-1 text-xs">
+                Add them in Vercel (Project → Settings → Environment Variables, scoped to Production),
+                then <strong>redeploy</strong>. For local dev, use <code>.env.local</code>.
+              </p>
+            </div>
           )}
         </div>
       ) : (

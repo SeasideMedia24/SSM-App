@@ -5,7 +5,7 @@ import { PricingEngine } from '@/components/settings/pricing-engine';
 import { GoogleCalendarSettings, type GoogleCalendarRow } from '@/components/settings/google-calendar';
 import { QuickbooksSettings } from '@/components/settings/quickbooks';
 import { googleConfigured } from '@/lib/google/calendar';
-import { quickbooksConfigured } from '@/lib/quickbooks/config';
+import { quickbooksConfigured, quickbooksEnvStatus } from '@/lib/quickbooks/config';
 
 export default async function SettingsPage({
   searchParams,
@@ -55,6 +55,7 @@ export default async function SettingsPage({
         <h2 className="mb-3 text-sm font-semibold text-slate-900">QuickBooks</h2>
         <QuickbooksSettings
           configured={quickbooksConfigured()}
+          envStatus={quickbooksEnvStatus()}
           companyName={qboAccount ? (qboAccount.company_name ?? null) : undefined}
           flag={quickbooksFlag}
         />

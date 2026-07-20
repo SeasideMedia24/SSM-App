@@ -17,6 +17,20 @@ export function quickbooksConfigured(): boolean {
   return Boolean(process.env.QUICKBOOKS_CLIENT_ID && process.env.QUICKBOOKS_CLIENT_SECRET);
 }
 
+// Per-variable status for the Settings card, so a misconfigured deploy says
+// exactly WHICH credential the server can't see (missing entirely vs present
+// but blank). Reports presence only — never the values.
+export type EnvVarState = 'ok' | 'missing' | 'empty';
+
+export function quickbooksEnvStatus(): Record<'QUICKBOOKS_CLIENT_ID' | 'QUICKBOOKS_CLIENT_SECRET', EnvVarState> {
+  const state = (v: string | undefined): EnvVarState =>
+    v === undefined ? 'missing' : v.trim() === '' ? 'empty' : 'ok';
+  return {
+    QUICKBOOKS_CLIENT_ID: state(process.env.QUICKBOOKS_CLIENT_ID),
+    QUICKBOOKS_CLIENT_SECRET: state(process.env.QUICKBOOKS_CLIENT_SECRET),
+  };
+}
+
 // Basic-auth header for the token endpoint (client_id:client_secret, base64).
 export function qboBasicAuth(): string {
   const raw = `${process.env.QUICKBOOKS_CLIENT_ID}:${process.env.QUICKBOOKS_CLIENT_SECRET}`;
