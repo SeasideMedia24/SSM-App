@@ -5,6 +5,8 @@
 //
 // To edit the wording, edit the sections below. LAST_UPDATED shows on the page.
 
+import { BrandLogo } from '@/components/brand-logo';
+
 export const metadata = {
   title: 'Terms of Service — Seaside Media Ops Hub',
   description: 'End-user license agreement for the Seaside Media Ops Hub application.',
@@ -96,8 +98,7 @@ export default function TermsPage() {
       <div className="mx-auto max-w-3xl">
         <div className="rounded-2xl bg-white p-10 shadow-sm ring-1 ring-slate-200">
           <header className="border-b border-slate-200 pb-6">
-            <p className="font-display text-3xl tracking-wide text-ink">SEASIDE MEDIA</p>
-            <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.25em] text-sea">Video Production</p>
+            <BrandLogo size="lg" />
             <h1 className="mt-6 text-2xl font-semibold text-ink">Terms of Service</h1>
             <p className="mt-1 text-sm text-slate-500">End-User License Agreement · Last updated {LAST_UPDATED}</p>
           </header>

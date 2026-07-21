@@ -5,6 +5,7 @@
 // work (from the signed contract).
 
 import { createAdminClient } from '@/lib/supabase/admin';
+import { BrandLogo } from '@/components/brand-logo';
 import { normalizeDeliverables } from '@/lib/contracts/template';
 import { freeBusy } from '@/lib/google/calendar';
 import { generateSlots, KICKOFF_CONFIG } from '@/lib/scheduling/slots';
@@ -20,7 +21,7 @@ function InactiveLink() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
-        <p className="font-display text-2xl tracking-wide text-ink">SEASIDE MEDIA</p>
+        <BrandLogo size="sm" tagline={false} className="justify-center" />
         <h1 className="mt-4 text-lg font-semibold text-ink">This project link isn’t active</h1>
         <p className="mt-2 text-sm text-slate-500">
           It may have been replaced or removed. Please reach out to Seaside Media for a fresh link.
@@ -88,8 +89,8 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
     <main className="min-h-screen bg-slate-100 px-4 py-10">
       <div className="mx-auto max-w-3xl">
         <header className="mb-6 rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
-          <p className="font-display text-3xl tracking-wide text-ink">SEASIDE MEDIA</p>
-          <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.25em] text-sea">Your project hub</p>
+          <BrandLogo size="lg" tagline={false} className="justify-center" />
+          <p className="mt-2 text-[11px] font-medium uppercase tracking-[0.25em] text-sea">Your project hub</p>
           <h1 className="mt-4 text-xl font-semibold text-ink">
             {client?.name ? `Welcome, ${client.name.split(' ')[0]}` : 'Welcome'} — {projectTitle}
           </h1>

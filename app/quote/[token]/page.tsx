@@ -5,6 +5,7 @@
 // only the single quote matching the token is ever exposed.
 
 import { createAdminClient } from '@/lib/supabase/admin';
+import { BrandLogo } from '@/components/brand-logo';
 import { PrintButton } from '@/components/quote/print-button';
 import { money } from '@/lib/projects/format';
 
@@ -24,7 +25,7 @@ export default async function SharedQuotePage({ params }: { params: Promise<{ to
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
         <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
-          <p className="font-display text-2xl tracking-wide text-ink">SEASIDE MEDIA</p>
+          <BrandLogo size="sm" tagline={false} className="justify-center" />
           <h1 className="mt-4 text-lg font-semibold text-ink">This quote link isn’t active</h1>
           <p className="mt-2 text-sm text-slate-500">
             It may have been replaced or removed. Please reach out to Seaside Media for a fresh link.
@@ -56,10 +57,7 @@ export default async function SharedQuotePage({ params }: { params: Promise<{ to
         {/* The document */}
         <div className="rounded-2xl bg-white p-10 shadow-sm ring-1 ring-slate-200 print:rounded-none print:p-0 print:shadow-none print:ring-0">
           <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-6">
-            <div>
-              <p className="font-display text-3xl tracking-wide text-ink">SEASIDE MEDIA</p>
-              <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.25em] text-sea">Video Production</p>
-            </div>
+            <BrandLogo size="lg" />
             <div className="text-right">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Quote</p>
               <p className="mt-0.5 text-sm text-slate-600">{date}</p>

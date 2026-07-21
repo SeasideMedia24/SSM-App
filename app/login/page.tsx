@@ -3,6 +3,7 @@
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { BrandLogo } from '@/components/brand-logo';
 import { LoginForm } from './login-form';
 
 export default async function LoginPage() {
@@ -26,8 +27,8 @@ export default async function LoginPage() {
 
       <div className="relative w-full max-w-sm rounded-2xl bg-white/95 p-8 shadow-2xl ring-1 ring-white/50 backdrop-blur">
         <div className="mb-7 text-center">
-          <h1 className="font-display text-4xl tracking-wide text-gradient">SEASIDE MEDIA</h1>
-          <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.3em] text-sea">Ops Hub</p>
+          <BrandLogo size="lg" tagline={false} className="justify-center" />
+          <p className="mt-2 text-[11px] font-medium uppercase tracking-[0.3em] text-sea">Ops Hub</p>
         </div>
         <LoginForm />
       </div>

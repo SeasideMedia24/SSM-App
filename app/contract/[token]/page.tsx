@@ -10,6 +10,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizeDeliverables } from '@/lib/contracts/template';
 import { SignForm } from './sign-form';
 import { WelcomePacket } from '@/components/contracts/welcome-packet';
+import { BrandLogo } from '@/components/brand-logo';
 
 export const metadata = { title: 'Your agreement — Seaside Media' };
 
@@ -34,7 +35,7 @@ function InactiveLink() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
-        <p className="font-display text-2xl tracking-wide text-ink">SEASIDE MEDIA</p>
+        <BrandLogo size="sm" tagline={false} className="justify-center" />
         <h1 className="mt-4 text-lg font-semibold text-ink">This contract link isn’t active</h1>
         <p className="mt-2 text-sm text-slate-500">
           It may have been replaced or removed. Please reach out to Seaside Media for a fresh link.
@@ -88,10 +89,7 @@ export default async function SharedContractPage({ params }: { params: Promise<{
         {/* The document */}
         <div className="rounded-2xl bg-white p-10 shadow-sm ring-1 ring-slate-200 print:rounded-none print:p-0 print:shadow-none print:ring-0">
           <header className="mb-6 flex items-center justify-between border-b border-slate-200 pb-6">
-            <div>
-              <p className="font-display text-3xl tracking-wide text-ink">SEASIDE MEDIA</p>
-              <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.25em] text-sea">Video Production</p>
-            </div>
+            <BrandLogo size="lg" />
             {signed && <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">Signed ✓</span>}
           </header>
 
