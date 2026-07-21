@@ -10,6 +10,7 @@ import { headers } from 'next/headers';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createDepositInvoice } from '@/lib/invoices/create';
 import { pushDepositInvoiceToQbo } from '@/lib/quickbooks/invoices';
+import { sendWelcomeEmail } from '@/lib/email/send';
 
 export type SignState = { ok: boolean; error: string | null };
 
@@ -92,6 +93,25 @@ export async function signContract(_prev: SignState, formData: FormData): Promis
     })
     .eq('id', c.id);
   if (error) return { ok: false, error: 'Something went wrong saving your signature. Please try again.' };
+
+  // Welcome email with the portal link (best-effort — never blocks signing).
+  if (clientId) {
+    const [{ data: clientRow }, { data: portalRow }] = await Promise.all([
+      admin.from('clients').select('name, email').eq('id', clientId).maybeSingle(),
+      admin.from('client_portal').select('portal_token').eq('project_id', c.project_id).maybeSingle(),
+    ]);
+    if (clientRow?.email && portalRow?.portal_token) {
+      const proto = h.get('x-forwarded-proto') ?? 'https';
+      const host = h.get('host') ?? '';
+      await sendWelcomeEmail({
+        origin: `${proto}://${host}`,
+        to: clientRow.email,
+        clientName: clientRow.name ?? '',
+        projectTitle: project?.title ?? 'your project',
+        portalUrl: `${proto}://${host}/portal/${portalRow.portal_token}`,
+      }).catch(() => null);
+    }
+  }
 
   revalidatePath(`/contract/${token}`);
   revalidatePath('/invoices');

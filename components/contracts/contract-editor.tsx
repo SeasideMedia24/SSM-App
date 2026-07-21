@@ -85,6 +85,7 @@ export function ContractEditor({
   const [token, setToken] = useState(contract.share_token);
   const [missing, setMissing] = useState<string[]>([]);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [emailStatus, setEmailStatus] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [copied, setCopied] = useState(false);
 
@@ -142,12 +143,19 @@ export function ContractEditor({
     start(async () => {
       setSendError(null);
       setMissing([]);
+      setEmailStatus(null);
       // Save the latest edits first, then send — one action from the owner's view.
       const saved = await updateContractTerms({ ok: false, error: null }, buildFormData());
       if (!saved.ok) { setSaveState(saved); return; }
       const res = await sendContractForSignature(contract.id);
-      if (res.ok) setToken(res.token);
-      else { setSendError(res.error); if (res.missing) setMissing(res.missing); }
+      if (res.ok) {
+        setToken(res.token);
+        setEmailStatus(
+          res.emailedTo
+            ? `Signature link emailed to ${res.emailedTo} ✓`
+            : res.emailNote ?? null,
+        );
+      } else { setSendError(res.error); if (res.missing) setMissing(res.missing); }
     });
   }
 
@@ -298,6 +306,9 @@ export function ContractEditor({
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               {signed ? 'Signed contract link' : 'Signature link'}
             </p>
+            {emailStatus && (
+              <p className={`text-xs ${emailStatus.endsWith('✓') ? 'text-emerald-700' : 'text-amber-700'}`}>{emailStatus}</p>
+            )}
             <div className="flex flex-wrap items-center gap-2">
               <input readOnly value={link} onFocus={(e) => e.currentTarget.select()} className="w-full max-w-full flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-600 outline-none" />
               <button type="button" onClick={copy} className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700">{copied ? 'Copied!' : 'Copy'}</button>

@@ -8,7 +8,9 @@
 
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
+import { headers } from 'next/headers';
 import { createClient as createSupabaseServer } from '@/lib/supabase/server';
+import { sendContractEmail } from '@/lib/email/send';
 import { buildContractFromQuote } from '@/lib/contracts/create';
 import { renderContract, normalizeDeliverables, type ContractTerms, type Deliverable } from '@/lib/contracts/template';
 import { contractReadiness } from '@/lib/contracts/validate';
@@ -121,7 +123,9 @@ export async function updateContractTerms(_prev: ContractFormState, f: FormData)
   return { ok: true, error: null };
 }
 
-export type SendResult = { ok: true; token: string } | { ok: false; error: string; missing?: string[] };
+export type SendResult =
+  | { ok: true; token: string; emailedTo?: string | null; emailNote?: string | null }
+  | { ok: false; error: string; missing?: string[] };
 
 // Render + snapshot the document, mark sent, mint the share link. Blocked unless
 // the readiness check passes (same gate PaePae will use).
@@ -131,12 +135,12 @@ export async function sendContractForSignature(contractId: string): Promise<Send
 
   const { data: c, error } = await supabase
     .from('contracts')
-    .select('*, projects ( id, title, clients ( name, company ) )')
+    .select('*, projects ( id, title, clients ( name, company, email ) )')
     .eq('id', contractId)
     .single();
   if (error || !c) return { ok: false, error: error?.code === '42703' ? MIGRATION_HINT : 'That contract no longer exists.' };
 
-  const project = c.projects as unknown as { title: string; clients: { name: string; company: string | null } | null } | null;
+  const project = c.projects as unknown as { title: string; clients: { name: string; company: string | null; email: string | null } | null } | null;
   const client = project?.clients ?? null;
   const deliverables = normalizeDeliverables(c.deliverables_snapshot);
 
@@ -176,8 +180,29 @@ export async function sendContractForSignature(contractId: string): Promise<Send
     .eq('id', contractId);
   if (uErr) return { ok: false, error: uErr.code === '42703' ? MIGRATION_HINT : 'Could not send. Please try again.' };
 
+  // Email the signature link to the client (best-effort — the link in the UI is
+  // always there regardless, and the editor shows what happened).
+  let emailedTo: string | null = null;
+  let emailNote: string | null = null;
+  if (client?.email) {
+    const h = await headers();
+    const proto = h.get('x-forwarded-proto') ?? 'https';
+    const host = h.get('host') ?? '';
+    const res = await sendContractEmail({
+      origin: `${proto}://${host}`,
+      to: client.email,
+      clientName: client.name ?? '',
+      projectTitle: project?.title ?? 'your project',
+      contractUrl: `${proto}://${host}/contract/${token}`,
+    });
+    if (res.ok) emailedTo = client.email;
+    else emailNote = res.reason;
+  } else {
+    emailNote = 'The client has no email on file — copy the link below and send it yourself.';
+  }
+
   revalidatePath(`/contracts/${contractId}`);
-  return { ok: true, token };
+  return { ok: true, token, emailedTo, emailNote };
 }
 
 export async function revokeContractLink(contractId: string): Promise<SendResult> {
