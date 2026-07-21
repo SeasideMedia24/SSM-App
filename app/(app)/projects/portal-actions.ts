@@ -26,6 +26,25 @@ export async function generatePortalToken(projectId: string): Promise<PortalResu
   return { ok: true, token };
 }
 
+// Set (or clear) the "files ready to review" link — e.g. a Frame.io URL. Shown
+// to the client on the portal only once it's set. Empty string clears it.
+export type ReviewLinkResult = { ok: true; url: string | null } | { ok: false; error: string };
+
+export async function setReviewLink(projectId: string, rawUrl: string): Promise<ReviewLinkResult> {
+  if (typeof projectId !== 'string' || projectId.length === 0) return { ok: false, error: 'Missing project.' };
+  const url = (rawUrl ?? '').trim();
+  if (url !== '' && !/^https?:\/\/.+/i.test(url)) {
+    return { ok: false, error: 'Enter a full link starting with https://' };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('client_portal')
+    .upsert({ project_id: projectId, review_link: url || null }, { onConflict: 'project_id' });
+  if (error) return { ok: false, error: isMissingTable(error.code) ? MIGRATION_HINT : 'Could not save the link. Please try again.' };
+  revalidatePath(`/projects/${projectId}`);
+  return { ok: true, url: url || null };
+}
+
 export async function revokePortalToken(projectId: string): Promise<PortalResult> {
   if (typeof projectId !== 'string' || projectId.length === 0) return { ok: false, error: 'Missing project.' };
   const supabase = await createClient();

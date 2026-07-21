@@ -1106,6 +1106,7 @@ export type Database = {
           kickoff_at: string | null;
           kickoff_link: string | null;
           submitted_at: string | null;
+          review_link: string | null;
           created_at: string;
         };
         Insert: {
@@ -1117,6 +1118,7 @@ export type Database = {
           kickoff_at?: string | null;
           kickoff_link?: string | null;
           submitted_at?: string | null;
+          review_link?: string | null;
           created_at?: string;
         };
         Update: {
@@ -1128,6 +1130,7 @@ export type Database = {
           kickoff_at?: string | null;
           kickoff_link?: string | null;
           submitted_at?: string | null;
+          review_link?: string | null;
           created_at?: string;
         };
         Relationships: [];

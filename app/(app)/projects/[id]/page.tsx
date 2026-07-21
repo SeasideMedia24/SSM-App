@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { PortalLinkControl } from '@/components/portal/portal-link-control';
+import { ReviewLinkControl } from '@/components/portal/review-link-control';
 import { ClientSubmission } from '@/components/portal/client-submission';
 import { buttonClass } from '@/components/ui/button-styles';
 import { DeleteProjectButton } from '@/components/projects/delete-project-button';
@@ -59,7 +60,7 @@ export default async function ProjectDetailPage({
     // Team members with logins — the assignable people for this project's tasks.
     supabase.from('contractors').select('name, user_id').not('user_id', 'is', null).order('name'),
     // Client portal (table may not exist pre-migration — handled gracefully).
-    supabase.from('client_portal').select('portal_token, brand, tech, links, submitted_at').eq('project_id', id).maybeSingle(),
+    supabase.from('client_portal').select('portal_token, brand, tech, links, submitted_at, review_link').eq('project_id', id).maybeSingle(),
   ]);
 
   // If the client has submitted portal details, pull their files and sign
@@ -175,6 +176,9 @@ export default async function ProjectDetailPage({
               Share this private link with {cl?.name ?? 'the client'} after they sign — it’s their hub for the kickoff, brand assets, and revisions.
             </p>
             <PortalLinkControl projectId={project.id} token={(portal?.portal_token as string | null) ?? null} />
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <ReviewLinkControl projectId={project.id} url={(portal?.review_link as string | null) ?? null} />
+            </div>
           </div>
 
           {hasPortalContent && submission && (

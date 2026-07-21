@@ -40,7 +40,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
 
   const { data: portal } = await admin
     .from('client_portal')
-    .select('project_id, kickoff_at, kickoff_link, submitted_at, brand, tech, links')
+    .select('project_id, kickoff_at, kickoff_link, submitted_at, brand, tech, links, review_link')
     .eq('portal_token', token)
     .maybeSingle();
 
@@ -145,6 +145,26 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
             deliveryAmount={Number(contract.delivery_amount ?? 0)}
             depositInvoiceUrl={depositInvoiceUrl}
           />
+        )}
+
+        {/* Files ready to review (Frame.io) — only shows once the owner sets it */}
+        {portal.review_link && (
+          <section className="mt-6 rounded-2xl border border-teal/40 bg-teal/5 p-6 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-ink">🎬 Your files are ready to review</h2>
+                <p className="mt-0.5 text-xs text-slate-500">Watch, comment, and approve your footage.</p>
+              </div>
+              <a
+                href={portal.review_link}
+                target="_blank"
+                rel="noreferrer"
+                className="brand-gradient rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-deep/20 transition hover:brightness-110"
+              >
+                Review your files →
+              </a>
+            </div>
+          </section>
         )}
 
         {/* Payments — the deposit invoice, front and center */}
