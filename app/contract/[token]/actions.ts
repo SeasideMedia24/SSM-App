@@ -9,6 +9,7 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createDepositInvoice } from '@/lib/invoices/create';
+import { pushDepositInvoiceToQbo } from '@/lib/quickbooks/invoices';
 
 export type SignState = { ok: boolean; error: string | null };
 
@@ -54,6 +55,10 @@ export async function signContract(_prev: SignState, formData: FormData): Promis
         .from('invoices')
         .update({ share_token: crypto.randomUUID(), status: 'sent', sent_at: new Date().toISOString() })
         .eq('id', inv.id);
+      // Best-effort: sync the deposit to QuickBooks with online payments on, so
+      // the portal gets a real Pay Now link. Signing NEVER fails on QB trouble —
+      // the error is recorded on the invoice (qbo_sync_error) for the owner.
+      await pushDepositInvoiceToQbo(admin, inv.id).catch(() => null);
     }
   }
 

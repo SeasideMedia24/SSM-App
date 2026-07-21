@@ -432,6 +432,7 @@ export type Database = {
           qbo_estimate_id: string | null;
           qbo_estimate_number: string | null;
           qbo_estimate_sent_at: string | null;
+          qbo_payment_link: string | null;
         };
         Insert: {
           id?: string;
@@ -457,6 +458,7 @@ export type Database = {
           qbo_estimate_id?: string | null;
           qbo_estimate_number?: string | null;
           qbo_estimate_sent_at?: string | null;
+          qbo_payment_link?: string | null;
         };
         Update: {
           id?: string;
@@ -482,6 +484,7 @@ export type Database = {
           qbo_estimate_id?: string | null;
           qbo_estimate_number?: string | null;
           qbo_estimate_sent_at?: string | null;
+          qbo_payment_link?: string | null;
         };
         Relationships: [
           {

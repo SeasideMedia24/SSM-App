@@ -17,7 +17,7 @@ export default async function SharedInvoicePage({ params }: { params: Promise<{ 
 
   const { data: invoice } = await admin
     .from('invoices')
-    .select('id, invoice_number, title, status, subtotal, total, notes, issue_date, due_date, created_at, clients ( name, company )')
+    .select('id, invoice_number, title, status, subtotal, total, notes, issue_date, due_date, created_at, qbo_payment_link, clients ( name, company )')
     .eq('share_token', token)
     .single();
 
@@ -49,8 +49,18 @@ export default async function SharedInvoicePage({ params }: { params: Promise<{ 
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-10 print:bg-white print:p-0">
       <div className="mx-auto max-w-3xl">
-        {/* Screen-only toolbar */}
-        <div className="mb-4 flex items-center justify-end print:hidden">
+        {/* Screen-only toolbar — Pay Now front and center when QB Payments is live */}
+        <div className="mb-4 flex items-center justify-between gap-3 print:hidden">
+          {!paid && invoice.qbo_payment_link ? (
+            <a
+              href={invoice.qbo_payment_link}
+              target="_blank"
+              rel="noreferrer"
+              className="brand-gradient rounded-xl px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-deep/20 transition hover:brightness-110"
+            >
+              Pay {money(invoice.total)} now →
+            </a>
+          ) : <span />}
           <PrintButton />
         </div>
 

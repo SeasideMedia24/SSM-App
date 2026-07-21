@@ -85,15 +85,17 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
   // Deposit invoice — the client's payment link (opens in a new tab).
   let depositInvoiceUrl: string | null = null;
   let depositInvoice: { total: number; status: string } | null = null;
+  let payNowUrl: string | null = null;
   if (contract?.deposit_invoice_id) {
     const { data: inv } = await admin
       .from('invoices')
-      .select('share_token, total, status')
+      .select('share_token, total, status, qbo_payment_link')
       .eq('id', contract.deposit_invoice_id)
       .maybeSingle();
     if (inv) {
       depositInvoice = { total: Number(inv.total), status: inv.status };
       if (inv.share_token) depositInvoiceUrl = `/invoice/${inv.share_token}`;
+      payNowUrl = inv.qbo_payment_link; // QB's hosted pay page (card/ACH)
     }
   }
 
@@ -156,15 +158,33 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
                   {depositInvoice.status === 'paid' ? 'Paid — thank you!' : 'Due now to lock your production dates.'}
                 </p>
               </div>
-              {depositInvoice.status !== 'paid' && depositInvoiceUrl && (
-                <a
-                  href={depositInvoiceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="brand-gradient rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-deep/20 transition hover:brightness-110"
-                >
-                  View & pay deposit
-                </a>
+              {depositInvoice.status !== 'paid' && (
+                <div className="flex flex-wrap items-center gap-3">
+                  {payNowUrl ? (
+                    <a
+                      href={payNowUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="brand-gradient rounded-xl px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-deep/20 transition hover:brightness-110"
+                    >
+                      Pay deposit now →
+                    </a>
+                  ) : depositInvoiceUrl ? (
+                    <a
+                      href={depositInvoiceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="brand-gradient rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-deep/20 transition hover:brightness-110"
+                    >
+                      View & pay deposit
+                    </a>
+                  ) : null}
+                  {payNowUrl && depositInvoiceUrl && (
+                    <a href={depositInvoiceUrl} target="_blank" rel="noreferrer" className="text-xs font-medium text-sea hover:underline">
+                      View invoice
+                    </a>
+                  )}
+                </div>
               )}
             </div>
           </section>

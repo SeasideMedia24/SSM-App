@@ -201,6 +201,93 @@ export async function sendQboInvoice(supabase: DB, invoiceId: string): Promise<{
   return { sentTo: email };
 }
 
+// ── Deposit invoice push (with online Pay Now link) ──────────────────────────
+// Pushes the app's deposit invoice into QuickBooks with online payments enabled
+// and captures QB's hosted "Review and pay" URL (invoiceLink) so the portal can
+// show a real Pay Now button. The link only materialises once QuickBooks
+// Payments is active on the company — without it we still sync the invoice and
+// simply store no link (the portal falls back to the app's invoice page).
+
+export async function pushDepositInvoiceToQbo(
+  supabase: DB,
+  invoiceId: string,
+): Promise<{ paymentLink: string | null }> {
+  const { data: invoice } = await supabase
+    .from('invoices')
+    .select('id, client_id, due_date, qbo_invoice_id, clients ( email )')
+    .eq('id', invoiceId)
+    .single();
+  if (!invoice) throw new Error('That invoice no longer exists.');
+
+  const clientEmail = (invoice.clients as unknown as { email: string | null } | null)?.email ?? null;
+
+  try {
+    const customerId = await ensureQboCustomer(supabase, invoice.client_id);
+    const itemId = await ensureDefaultItem(supabase);
+
+    const { data: lineRows } = await supabase
+      .from('invoice_line_items')
+      .select('label, quantity, rate, amount, position')
+      .eq('invoice_id', invoiceId)
+      .order('position');
+    const lines = (lineRows ?? []) as InvoiceLine[];
+    if (lines.length === 0) throw new Error('This invoice has no line items to send.');
+
+    const body: Record<string, unknown> = {
+      CustomerRef: { value: customerId },
+      Line: lines.map((l) => ({
+        DetailType: 'SalesItemLineDetail' as const,
+        Amount: Number(l.amount),
+        Description: l.label,
+        SalesItemLineDetail: { ItemRef: { value: itemId } },
+      })),
+      AllowOnlineCreditCardPayment: true,
+      AllowOnlineACHPayment: true,
+      ...(invoice.due_date ? { DueDate: invoice.due_date } : {}),
+      ...(clientEmail ? { BillEmail: { Address: clientEmail } } : {}),
+    };
+
+    if (invoice.qbo_invoice_id) {
+      const existing = (await qboFetch(supabase, `/invoice/${invoice.qbo_invoice_id}`)) as {
+        Invoice?: { SyncToken: string };
+      };
+      const syncToken = existing.Invoice?.SyncToken;
+      if (syncToken) {
+        body.Id = invoice.qbo_invoice_id;
+        body.SyncToken = syncToken;
+        body.sparse = true;
+      }
+    }
+
+    // `include=invoiceLink` asks QB to return the hosted payment URL.
+    const res = (await qboFetch(supabase, '/invoice?include=invoiceLink', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })) as { Invoice?: { Id: string; DocNumber?: string; InvoiceLink?: string } };
+
+    const qboId = res.Invoice?.Id;
+    if (!qboId) throw new Error('QuickBooks did not return an invoice id.');
+    const paymentLink = res.Invoice?.InvoiceLink ?? null;
+
+    await supabase
+      .from('invoices')
+      .update({
+        qbo_invoice_id: qboId,
+        qbo_doc_number: res.Invoice?.DocNumber ?? null,
+        qbo_payment_link: paymentLink,
+        qbo_synced_at: new Date().toISOString(),
+        qbo_sync_error: null,
+      })
+      .eq('id', invoiceId);
+
+    return { paymentLink };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'QuickBooks sync failed.';
+    await supabase.from('invoices').update({ qbo_sync_error: message }).eq('id', invoiceId);
+    throw new Error(message);
+  }
+}
+
 // ── Estimate push + send ──────────────────────────────────────────────────────
 // Seaside's flow is estimate-first: PaePae sends an ESTIMATE for the client to
 // approve; QuickBooks converts the accepted estimate into an invoice (in QB).
