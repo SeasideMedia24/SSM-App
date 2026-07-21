@@ -57,6 +57,19 @@ export async function signContract(_prev: SignState, formData: FormData): Promis
     }
   }
 
+  // The portal is the client's home from here on — make sure it exists so the
+  // signed page can always hand off to it. (Idempotent: keeps an existing row.)
+  const { data: existingPortal } = await admin
+    .from('client_portal')
+    .select('project_id, portal_token')
+    .eq('project_id', c.project_id)
+    .maybeSingle();
+  if (!existingPortal) {
+    await admin.from('client_portal').insert({ project_id: c.project_id, portal_token: crypto.randomUUID() });
+  } else if (!existingPortal.portal_token) {
+    await admin.from('client_portal').update({ portal_token: crypto.randomUUID() }).eq('project_id', c.project_id);
+  }
+
   const h = await headers();
   const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
   const nowIso = new Date().toISOString();

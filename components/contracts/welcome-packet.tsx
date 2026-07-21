@@ -42,7 +42,12 @@ export function WelcomePacket(p: WelcomePacketProps) {
             <p className="text-sm font-semibold text-ink">Your deposit invoice is ready</p>
             <p className="text-sm text-slate-500">Pay {money(p.depositAmount)} to lock in your production dates.</p>
           </div>
-          <a href={p.depositInvoiceUrl} className="brand-gradient rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-deep/20 transition hover:brightness-110">
+          <a
+            href={p.depositInvoiceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="brand-gradient rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-deep/20 transition hover:brightness-110"
+          >
             View deposit invoice
           </a>
         </div>
