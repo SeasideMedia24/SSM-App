@@ -90,7 +90,15 @@ export default async function SharedContractPage({ params }: { params: Promise<{
         <div className="rounded-2xl bg-white p-10 shadow-sm ring-1 ring-slate-200 print:rounded-none print:p-0 print:shadow-none print:ring-0">
           <header className="mb-6 flex items-center justify-between border-b border-slate-200 pb-6">
             <BrandLogo size="lg" />
-            {signed && <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">Signed ✓</span>}
+            <div className="flex items-center gap-3">
+              {signed && <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">Signed ✓</span>}
+              <a
+                href={`/contract/${token}/pdf`}
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-teal hover:text-sea print:hidden"
+              >
+                Download PDF
+              </a>
+            </div>
           </header>
 
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={md}>{contract.body_md}</ReactMarkdown>

@@ -238,14 +238,22 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
           <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-ink">Your agreement</h2>
             <p className="mb-3 mt-0.5 text-xs text-slate-400">The signed contract for this project, any time you need it.</p>
-            <a
-              href={`/contract/${contract.share_token}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-block rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-teal hover:text-sea"
-            >
-              View signed contract
-            </a>
+            <div className="flex flex-wrap gap-3">
+              <a
+                href={`/contract/${contract.share_token}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-block rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-teal hover:text-sea"
+              >
+                View signed contract
+              </a>
+              <a
+                href={`/contract/${contract.share_token}/pdf`}
+                className="inline-block rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-teal hover:text-sea"
+              >
+                Download PDF
+              </a>
+            </div>
           </section>
         )}
 

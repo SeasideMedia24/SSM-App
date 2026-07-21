@@ -302,6 +302,7 @@ export function ContractEditor({
               <input readOnly value={link} onFocus={(e) => e.currentTarget.select()} className="w-full max-w-full flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-600 outline-none" />
               <button type="button" onClick={copy} className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700">{copied ? 'Copied!' : 'Copy'}</button>
               <a href={link} target="_blank" rel="noreferrer" className="rounded-lg bg-sea px-3 py-1.5 text-xs font-medium text-white hover:brightness-110">Open</a>
+              <a href={`${link}/pdf`} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-teal hover:text-sea">PDF</a>
               {!signed && <button type="button" onClick={revoke} disabled={pending} className="text-xs text-slate-400 hover:text-red-600 disabled:opacity-60">Turn off</button>}
             </div>
             {contract.deposit_invoice_id && (
