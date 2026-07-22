@@ -6,6 +6,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { MyTaskRow, type MyTask } from '@/components/work/my-task-row';
+import { TaskTimeline } from '@/components/work/task-timeline';
 import { BrandLogo } from '@/components/brand-logo';
 import { unreadCount } from '@/lib/messages/queries';
 import { projectStatusMeta } from '@/lib/projects/status';
@@ -25,7 +26,7 @@ export default async function MyWorkPage() {
       supabase.from('project_contractors').select('project_id, role'),
       supabase.from('projects').select('id, title, status, description, start_date, due_date').order('due_date', { nullsFirst: false }),
       supabase.from('tasks').select('id, project_id, title, status, priority, due_date, worker_note, assignee_id').order('due_date', { nullsFirst: false }),
-      supabase.from('deliverables').select('id, project_id, title, status, due_date').order('due_date', { nullsFirst: false }),
+      supabase.from('deliverables').select('id, project_id, title, status, due_date, assignee_id').order('due_date', { nullsFirst: false }),
       supabase.from('milestones').select('id, project_id, title, status, date').order('date'),
       unreadCount(supabase),
     ]);
@@ -63,6 +64,10 @@ export default async function MyWorkPage() {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="mb-6">
+        <TaskTimeline tasks={(tasks ?? []).filter((t) => my(t) && t.status !== 'done').map((t) => ({ id: t.id, title: t.title, due_date: t.due_date, priority: t.priority }))} />
       </div>
 
       {projectList.length === 0 && standalone.length === 0 && (
@@ -127,6 +132,7 @@ export default async function MyWorkPage() {
                         {pDeliv.map((d) => (
                           <li key={d.id} className={d.status === 'done' ? 'text-slate-400 line-through' : ''}>
                             {d.title}{fmtDate(d.due_date) ? ` · ${fmtDate(d.due_date)}` : ''}
+                            {d.assignee_id === user?.id && <span className="ml-1.5 rounded-full bg-teal/10 px-1.5 py-0.5 text-[10px] font-medium text-sea">yours</span>}
                           </li>
                         ))}
                       </ul>
