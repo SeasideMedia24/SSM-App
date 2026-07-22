@@ -17,13 +17,33 @@ export type ThreadSummary = {
   unread: boolean;
 };
 
+export type MessageRefChip = { kind: 'project' | 'task' | 'deliverable'; label: string };
+
 export type ThreadMessage = {
   id: string;
   body: string;
   createdAt: string;
   mine: boolean;
   senderName: string;
+  ref?: MessageRefChip;
 };
+
+// A short, viewer-facing list of things a message can reference. RLS-scoped, so
+// each viewer only sees items they can access.
+export type AttachableItems = {
+  projects: { id: string; title: string }[];
+  tasks: { id: string; title: string }[];
+  deliverables: { id: string; title: string }[];
+};
+
+export async function attachableItems(supabase: DB): Promise<AttachableItems> {
+  const [{ data: projects }, { data: tasks }, { data: deliverables }] = await Promise.all([
+    supabase.from('projects').select('id, title').neq('status', 'archived').order('created_at', { ascending: false }).limit(60),
+    supabase.from('tasks').select('id, title').neq('status', 'done').order('created_at', { ascending: false }).limit(100),
+    supabase.from('deliverables').select('id, title').neq('status', 'done').order('created_at', { ascending: false }).limit(100),
+  ]);
+  return { projects: projects ?? [], tasks: tasks ?? [], deliverables: deliverables ?? [] };
+}
 
 // Every thread the viewer can see, newest activity first, with an unread flag.
 export async function listThreads(supabase: DB, viewerId: string): Promise<ThreadSummary[]> {
@@ -72,19 +92,38 @@ export async function listThreads(supabase: DB, viewerId: string): Promise<Threa
 export async function getThreadMessages(supabase: DB, threadId: string, viewerId: string): Promise<ThreadMessage[]> {
   const { data } = await supabase
     .from('messages')
-    .select('id, body, created_at, sender_id, profiles ( full_name )')
+    .select('id, body, created_at, sender_id, ref_type, ref_id, profiles ( full_name )')
     .eq('thread_id', threadId)
     .order('created_at')
     .limit(500);
-  return (data ?? []).map((m) => {
+  const rows = data ?? [];
+
+  // Resolve any referenced items to a title (batched per table).
+  const idsByType: Record<string, string[]> = { project: [], task: [], deliverable: [] };
+  for (const m of rows) if (m.ref_type && m.ref_id && idsByType[m.ref_type]) idsByType[m.ref_type].push(m.ref_id);
+  const titles = new Map<string, string>(); // `${type}:${id}` → title
+  await Promise.all(
+    (['project', 'task', 'deliverable'] as const).map(async (type) => {
+      const ids = [...new Set(idsByType[type])];
+      if (ids.length === 0) return;
+      const table = type === 'project' ? 'projects' : type === 'task' ? 'tasks' : 'deliverables';
+      const { data: items } = await supabase.from(table).select('id, title').in('id', ids);
+      for (const it of items ?? []) titles.set(`${type}:${it.id}`, it.title);
+    }),
+  );
+
+  return rows.map((m) => {
     const prof = m.profiles as unknown as { full_name: string | null } | { full_name: string | null }[] | null;
     const name = Array.isArray(prof) ? prof[0]?.full_name : prof?.full_name;
+    const kind = m.ref_type as MessageRefChip['kind'] | null;
+    const label = kind && m.ref_id ? titles.get(`${kind}:${m.ref_id}`) : undefined;
     return {
       id: m.id,
       body: m.body,
       createdAt: m.created_at,
       mine: m.sender_id === viewerId,
       senderName: name ?? 'Someone',
+      ref: kind && label ? { kind, label } : undefined,
     };
   });
 }
