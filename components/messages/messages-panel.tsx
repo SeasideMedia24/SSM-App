@@ -40,8 +40,8 @@ export function MessagesPanel({
 
   return (
     <div className="grid min-h-[28rem] grid-cols-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:grid-cols-[16rem_1fr]">
-      {/* Thread list */}
-      <aside className="border-b border-slate-200 md:border-b-0 md:border-r">
+      {/* Thread list — on mobile, hidden once a conversation is open. */}
+      <aside className={`border-b border-slate-200 md:border-b-0 md:border-r ${selected ? 'hidden md:block' : 'block'}`}>
         {threads.length === 0 ? (
           <p className="p-4 text-sm text-slate-400">{emptyHint}</p>
         ) : (
@@ -67,11 +67,11 @@ export function MessagesPanel({
         )}
       </aside>
 
-      {/* Conversation */}
+      {/* Conversation — on mobile, only shown once a thread is picked. */}
       {selected ? (
-        <ChatPane key={selected.id} threadId={selected.id} title={selected.kind === 'project' ? `# ${selected.title}` : selected.title} messages={messages} attachable={attachable} />
+        <ChatPane key={selected.id} threadId={selected.id} title={selected.kind === 'project' ? `# ${selected.title}` : selected.title} messages={messages} attachable={attachable} basePath={basePath} />
       ) : (
-        <div className="flex items-center justify-center p-10 text-sm text-slate-400">
+        <div className="hidden items-center justify-center p-10 text-sm text-slate-400 md:flex">
           {threads.length === 0 ? 'No conversations yet.' : 'Pick a conversation.'}
         </div>
       )}
@@ -79,7 +79,7 @@ export function MessagesPanel({
   );
 }
 
-function ChatPane({ threadId, title, messages, attachable }: { threadId: string; title: string; messages: ThreadMessage[]; attachable: AttachableItems }) {
+function ChatPane({ threadId, title, messages, attachable, basePath }: { threadId: string; title: string; messages: ThreadMessage[]; attachable: AttachableItems; basePath: string }) {
   const router = useRouter();
   const [body, setBody] = useState('');
   const [ref, setRef] = useState<{ type: MessageRef['type']; id: string; label: string } | null>(null);
@@ -116,7 +116,8 @@ function ChatPane({ threadId, title, messages, attachable }: { threadId: string;
 
   return (
     <section className="flex max-h-[70vh] flex-col">
-      <header className="border-b border-slate-100 px-4 py-3">
+      <header className="flex items-center gap-2 border-b border-slate-100 px-4 py-3">
+        <Link href={basePath} className="text-slate-400 hover:text-sea md:hidden" aria-label="Back to conversations">←</Link>
         <h2 className="text-sm font-semibold text-ink">{title}</h2>
       </header>
 
