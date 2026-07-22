@@ -6,6 +6,7 @@ import { buttonClass } from '@/components/ui/button-styles';
 import { DeleteContractorButton } from '@/components/contractors/delete-contractor-button';
 import { OnboardLinkControl } from '@/components/contractors/onboard-link-control';
 import { InviteLoginControl } from '@/components/contractors/invite-login-control';
+import { ClearancePicker, AssignmentClearancePicker } from '@/components/contractors/clearance-picker';
 import { assignProject, unassignProject } from '../actions';
 import { contractorTypeMeta } from '@/lib/projects/status';
 import { money, contractorRatesSummary } from '@/lib/projects/format';
@@ -31,7 +32,7 @@ export default async function ContractorDetailPage({
   const [{ data: assignments }, { data: allProjects }] = await Promise.all([
     supabase
       .from('project_contractors')
-      .select('id, role, rate, rate_unit, projects ( id, title )')
+      .select('id, role, rate, rate_unit, clearance, projects ( id, title )')
       .eq('contractor_id', id)
       .order('created_at'),
     supabase.from('projects').select('id, title').neq('status', 'archived').order('title'),
@@ -91,6 +92,9 @@ export default async function ContractorDetailPage({
           and tasks — never money, clients, or anyone else&rsquo;s details.
         </p>
         <InviteLoginControl contractorId={contractor.id} email={contractor.email} linked={!!contractor.user_id} />
+        <div className="mt-4 border-t border-slate-100 pt-4">
+          <ClearancePicker contractorId={contractor.id} level={(contractor.clearance as number | null) ?? 1} />
+        </div>
       </section>
 
       {/* Project assignments */}
@@ -116,6 +120,12 @@ export default async function ContractorDetailPage({
                     <span className="text-slate-400">(project removed)</span>
                   )}
                   {r.role && <span className="text-xs text-slate-500">{r.role}</span>}
+                  <AssignmentClearancePicker
+                    assignmentId={r.id}
+                    contractorId={contractor.id}
+                    override={(r.clearance as number | null) ?? null}
+                    personDefault={(contractor.clearance as number | null) ?? 1}
+                  />
                   <span className="ml-auto text-slate-600">{rate}</span>
                   <form action={unassignProject}>
                     <input type="hidden" name="assignment_id" value={r.id} />

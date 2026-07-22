@@ -116,6 +116,45 @@ export async function unassignProject(formData: FormData) {
   if (contractorId) revalidatePath(`/contractors/${contractorId}`);
 }
 
+// ── Clearance ────────────────────────────────────────────────────────────────
+// A person's default level lives on contractors.clearance; each assignment can
+// override it (project_contractors.clearance, null = use the default). Owner
+// only — verified here AND enforced by RLS.
+
+export type ClearanceResult = { ok: boolean; message?: string };
+
+const MIGRATION_HINT_CLEARANCE =
+  'Clearance needs a quick database update — run supabase/migrations/20260722000002_clearance.sql in the Supabase SQL Editor, then try again.';
+
+export async function setContractorClearance(contractorId: string, level: number): Promise<ClearanceResult> {
+  if (!contractorId || ![1, 2, 3].includes(level)) return { ok: false, message: 'Pick a level 1–3.' };
+  const supabase = await createSupabaseServer();
+  const { getAppRole } = await import('@/lib/auth/role');
+  if ((await getAppRole(supabase)) !== 'owner') return { ok: false, message: 'Owner only.' };
+
+  const { error } = await supabase.from('contractors').update({ clearance: level }).eq('id', contractorId);
+  if (error) return { ok: false, message: error.code === '42703' ? MIGRATION_HINT_CLEARANCE : 'Could not save. Please try again.' };
+  revalidatePath(`/contractors/${contractorId}`);
+  return { ok: true };
+}
+
+export async function setAssignmentClearance(
+  assignmentId: string,
+  contractorId: string,
+  level: number | null, // null = clear the override (use the person's default)
+): Promise<ClearanceResult> {
+  if (!assignmentId) return { ok: false, message: 'Missing assignment.' };
+  if (level !== null && ![1, 2, 3].includes(level)) return { ok: false, message: 'Pick a level 1–3.' };
+  const supabase = await createSupabaseServer();
+  const { getAppRole } = await import('@/lib/auth/role');
+  if ((await getAppRole(supabase)) !== 'owner') return { ok: false, message: 'Owner only.' };
+
+  const { error } = await supabase.from('project_contractors').update({ clearance: level }).eq('id', assignmentId);
+  if (error) return { ok: false, message: error.code === '42703' ? MIGRATION_HINT_CLEARANCE : 'Could not save. Please try again.' };
+  revalidatePath(`/contractors/${contractorId}`);
+  return { ok: true };
+}
+
 // ── Slice B1: invite a contractor to log in ──────────────────────────────────
 // Uses the ADMIN client (service role) because creating auth users is an admin
 // operation — so we explicitly verify the caller is the owner first.

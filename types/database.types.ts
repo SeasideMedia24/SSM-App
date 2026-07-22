@@ -565,6 +565,7 @@ export type Database = {
           onboard_token: string | null;
           onboarded_at: string | null;
           user_id: string | null;
+          clearance: number;
           created_at: string;
         };
         Insert: {
@@ -581,6 +582,7 @@ export type Database = {
           onboard_token?: string | null;
           onboarded_at?: string | null;
           user_id?: string | null;
+          clearance?: number;
           created_at?: string;
         };
         Update: {
@@ -597,6 +599,7 @@ export type Database = {
           onboard_token?: string | null;
           onboarded_at?: string | null;
           user_id?: string | null;
+          clearance?: number;
           created_at?: string;
         };
         Relationships: [
@@ -616,6 +619,7 @@ export type Database = {
           role: string | null;
           rate: number | null;
           rate_unit: string | null;
+          clearance: number | null;
           created_at: string;
         };
         Insert: {
@@ -625,6 +629,7 @@ export type Database = {
           role?: string | null;
           rate?: number | null;
           rate_unit?: string | null;
+          clearance?: number | null;
           created_at?: string;
         };
         Update: {
@@ -634,6 +639,7 @@ export type Database = {
           role?: string | null;
           rate?: number | null;
           rate_unit?: string | null;
+          clearance?: number | null;
           created_at?: string;
         };
         Relationships: [
