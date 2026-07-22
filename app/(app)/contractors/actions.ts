@@ -209,7 +209,11 @@ export async function inviteContractorLogin(contractorId: string): Promise<Invit
     email: contractor.email,
     options: {
       data: { full_name: contractor.name, contractor_id: contractor.id },
-      redirectTo: `${origin}/welcome`,
+      // MUST land on /auth/confirm — that route runs exchangeCodeForSession to
+      // actually establish the session, then forwards invites to /welcome to
+      // set a password. Pointing straight at /welcome skips the exchange, so the
+      // visitor arrives with no session and gets bounced to /login.
+      redirectTo: `${origin}/auth/confirm`,
     },
   });
   const inviteUrl = linkData?.properties?.action_link;
