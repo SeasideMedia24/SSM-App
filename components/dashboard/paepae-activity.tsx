@@ -1,10 +1,13 @@
 'use client';
 
-// The dashboard "what PaePae did recently" list. Each row is a confirmed action
-// from the last few days; click one to expand exactly what happened (the same
-// summary lines the owner approved, plus PaePae's result message).
+// The dashboard "what PaePae did recently" list. Newest 10 unarchived rows show;
+// older or archived ones fold into the collapsed Archive below (nothing is
+// deleted). Click a row to expand exactly what happened (the same summary lines
+// the owner approved, plus PaePae's result message).
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
+import { setPaepaeActionArchived } from '@/app/(app)/dashboard/actions';
+import { Collapsible } from '@/components/ui/collapsible';
 
 export type PaepaeAction = {
   id: string;
@@ -55,54 +58,79 @@ function timeAgo(iso: string): string {
   return `${days}d ago`;
 }
 
-export function PaepaeActivity({ actions }: { actions: PaepaeAction[] }) {
+export function PaepaeActivity({ actions, archived = [] }: { actions: PaepaeAction[]; archived?: PaepaeAction[] }) {
   const [openId, setOpenId] = useState<string | null>(null);
 
-  if (actions.length === 0) {
-    return <p className="py-2 text-sm text-slate-400">PaePae hasn’t made any changes in the last 5 days.</p>;
+  if (actions.length === 0 && archived.length === 0) {
+    return <p className="py-2 text-sm text-slate-400">PaePae hasn’t made any changes yet.</p>;
   }
 
   return (
-    <ul className="divide-y divide-slate-100">
-      {actions.map((a) => {
-        const open = openId === a.id;
-        return (
-          <li key={a.id}>
-            <button
-              type="button"
-              onClick={() => setOpenId(open ? null : a.id)}
-              aria-expanded={open}
-              className="flex w-full items-center gap-2 py-2 text-left text-sm"
-            >
-              <span className="truncate text-ink">{headline(a)}</span>
-              <span className="ml-auto shrink-0 text-[11px] text-slate-400">{timeAgo(a.created_at)}</span>
-              <svg
-                width={13}
-                height={13}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2.4}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={`shrink-0 text-slate-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-              >
-                <path d="m6 9 6 6 6-6" />
-              </svg>
-            </button>
-            {open && a.summary.length > 0 && (
-              <div className="mb-2 rounded-xl bg-slate-50 px-3 py-2 text-sm">
-                <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">Details</p>
-                <ul className="space-y-0.5 text-xs text-slate-500">
-                  {a.summary.map((line, i) => (
-                    <li key={i}>{line}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </li>
-        );
-      })}
-    </ul>
+    <div className="flex flex-col gap-2">
+      {actions.length === 0 ? (
+        <p className="py-2 text-sm text-slate-400">Nothing new — everything’s in the archive below.</p>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {actions.map((a) => (
+            <Row key={a.id} a={a} open={openId === a.id} onToggle={() => setOpenId(openId === a.id ? null : a.id)} archived={false} />
+          ))}
+        </ul>
+      )}
+      {archived.length > 0 && (
+        <Collapsible title="Archive" count={archived.length} defaultOpen={false}>
+          <ul className="divide-y divide-slate-100">
+            {archived.map((a) => (
+              <Row key={a.id} a={a} open={openId === a.id} onToggle={() => setOpenId(openId === a.id ? null : a.id)} archived />
+            ))}
+          </ul>
+        </Collapsible>
+      )}
+    </div>
+  );
+}
+
+function Row({ a, open, onToggle, archived }: { a: PaepaeAction; open: boolean; onToggle: () => void; archived: boolean }) {
+  const [pending, start] = useTransition();
+  return (
+    <li className={archived ? 'opacity-70' : undefined}>
+      <div className="flex w-full items-center gap-2 py-2 text-sm">
+        <button type="button" onClick={onToggle} aria-expanded={open} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+          <span className="truncate text-ink">{headline(a)}</span>
+          <svg
+            width={13}
+            height={13}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.4}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`shrink-0 text-slate-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+        <span className="ml-auto shrink-0 text-[11px] text-slate-400">{timeAgo(a.created_at)}</span>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => start(async () => { await setPaepaeActionArchived(a.id, !archived); })}
+          title={archived ? 'Restore to the list' : 'Archive (tuck away, keep history)'}
+          className="shrink-0 text-[11px] font-medium text-slate-300 transition-colors hover:text-sea disabled:opacity-50"
+        >
+          {archived ? 'Restore' : 'Archive'}
+        </button>
+      </div>
+      {open && a.summary.length > 0 && (
+        <div className="mb-2 rounded-xl bg-slate-50 px-3 py-2 text-sm">
+          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">Details</p>
+          <ul className="space-y-0.5 text-xs text-slate-500">
+            {a.summary.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </li>
   );
 }

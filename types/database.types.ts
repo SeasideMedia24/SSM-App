@@ -325,6 +325,7 @@ export type Database = {
           calculator_state: Json | null;
           share_token: string | null;
           created_at: string;
+          dashboard_archived_at: string | null;
         };
         Insert: {
           id?: string;
@@ -338,6 +339,7 @@ export type Database = {
           calculator_state?: Json | null;
           share_token?: string | null;
           created_at?: string;
+          dashboard_archived_at?: string | null;
         };
         Update: {
           id?: string;
@@ -351,6 +353,7 @@ export type Database = {
           calculator_state?: Json | null;
           share_token?: string | null;
           created_at?: string;
+          dashboard_archived_at?: string | null;
         };
         Relationships: [
           {
@@ -656,6 +659,7 @@ export type Database = {
           summary: string[];
           result: string | null;
           created_at: string;
+          archived_at: string | null;
         };
         Insert: {
           id?: string;
@@ -664,6 +668,7 @@ export type Database = {
           summary?: string[];
           result?: string | null;
           created_at?: string;
+          archived_at?: string | null;
         };
         Update: {
           id?: string;
@@ -672,6 +677,7 @@ export type Database = {
           summary?: string[];
           result?: string | null;
           created_at?: string;
+          archived_at?: string | null;
         };
         Relationships: [
           {
