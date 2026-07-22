@@ -12,6 +12,7 @@ import { Sidebar } from '@/components/sidebar';
 import { UndoProvider } from '@/components/undo/undo-provider';
 import { PaepaeDock } from '@/components/paepae/paepae-dock';
 import { TimezoneCookie } from '@/components/util/timezone-cookie';
+import { MessagesLive } from '@/components/messages/messages-live';
 
 export default async function AppLayout({
   children,
@@ -76,6 +77,7 @@ export default async function AppLayout({
         {/* PaePae, reachable from every tab; records the viewer's timezone. */}
         <PaepaeDock />
         <TimezoneCookie />
+        <MessagesLive userId={user.id} basePath="/messages" />
       </div>
     </UndoProvider>
   );

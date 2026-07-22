@@ -690,16 +690,19 @@ export type Database = {
           thread_id: string;
           user_id: string;
           last_read_at: string | null;
+          notified_at: string | null;
         };
         Insert: {
           thread_id: string;
           user_id: string;
           last_read_at?: string | null;
+          notified_at?: string | null;
         };
         Update: {
           thread_id?: string;
           user_id?: string;
           last_read_at?: string | null;
+          notified_at?: string | null;
         };
         Relationships: [
           {
@@ -722,6 +725,8 @@ export type Database = {
           thread_id: string;
           sender_id: string;
           body: string;
+          ref_type: string | null;
+          ref_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -729,6 +734,8 @@ export type Database = {
           thread_id: string;
           sender_id: string;
           body: string;
+          ref_type?: string | null;
+          ref_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -736,6 +743,8 @@ export type Database = {
           thread_id?: string;
           sender_id?: string;
           body?: string;
+          ref_type?: string | null;
+          ref_id?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -896,6 +905,7 @@ export type Database = {
           due_date: string | null;
           position: number;
           created_at: string;
+          assignee_id: string | null;
         };
         Insert: {
           id?: string;
@@ -906,6 +916,7 @@ export type Database = {
           due_date?: string | null;
           position?: number;
           created_at?: string;
+          assignee_id?: string | null;
         };
         Update: {
           id?: string;
@@ -916,6 +927,7 @@ export type Database = {
           due_date?: string | null;
           position?: number;
           created_at?: string;
+          assignee_id?: string | null;
         };
         Relationships: [
           {

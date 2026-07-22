@@ -7,12 +7,14 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getAppRole } from '@/lib/auth/role';
 import { unreadCount } from '@/lib/messages/queries';
+import { MessagesLive } from '@/components/messages/messages-live';
 import { logout } from '@/app/login/actions';
 
 export default async function WorkLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
   const role = await getAppRole(supabase);
-  if (!role) redirect('/login');
+  if (!user || !role) redirect('/login');
   if (role === 'owner') redirect('/dashboard');
 
   const unread = await unreadCount(supabase);
@@ -48,6 +50,7 @@ export default async function WorkLayout({ children }: { children: React.ReactNo
         </div>
       </header>
       <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-8">{children}</main>
+      <MessagesLive userId={user.id} basePath="/my-messages" />
     </div>
   );
 }

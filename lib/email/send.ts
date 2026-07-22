@@ -79,6 +79,26 @@ export async function sendContractEmail(opts: {
   return deliver(opts.to, `Your Seaside Media agreement — ${opts.projectTitle}`, html);
 }
 
+export async function sendMessageEmail(opts: {
+  origin: string;
+  to: string;
+  recipientName: string;
+  senderName: string;
+  preview: string;
+  threadUrl: string;
+}): Promise<EmailResult> {
+  const first = opts.recipientName.split(' ')[0] || 'there';
+  const html = shell(
+    opts.origin,
+    `New message from ${opts.senderName}`,
+    `<p style="margin:0 0 8px;line-height:1.6;">Hi ${first},</p>
+     <p style="margin:0 0 8px;line-height:1.6;">${opts.senderName} sent you a message:</p>
+     <blockquote style="margin:0 0 8px;padding:10px 14px;border-left:3px solid ${BRAND_SEA};background:#f8fafc;color:#475569;line-height:1.6;">${opts.preview}</blockquote>
+     ${button(opts.threadUrl, 'Reply')}`,
+  );
+  return deliver(opts.to, `New message from ${opts.senderName} — Seaside Media`, html);
+}
+
 export async function sendWelcomeEmail(opts: {
   origin: string;
   to: string;

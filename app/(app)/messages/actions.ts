@@ -6,9 +6,12 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { notifyThreadByEmail } from '@/lib/messages/notify';
 
 export type PostResult = { ok: boolean; error?: string };
+export type MessageRef = { type: 'project' | 'task' | 'deliverable'; id: string };
 
 const MIGRATION_HINT =
   'Messages need a quick database update — run supabase/migrations/20260722000003_messages.sql in the Supabase SQL Editor, then try again.';
@@ -16,8 +19,10 @@ const MIGRATION_HINT =
 const missingTable = (code?: string) => code === '42P01' || code === '42883';
 
 // Post into a thread. RLS enforces access (owner, participant, or assigned to
-// the project) and that sender_id is the caller.
-export async function postMessage(threadId: string, body: string): Promise<PostResult> {
+// the project) and that sender_id is the caller. An optional ref attaches a
+// project/task/deliverable chip. Fires a best-effort email to recipients who
+// haven't read the thread lately (never blocks the send).
+export async function postMessage(threadId: string, body: string, ref?: MessageRef | null): Promise<PostResult> {
   const text = (body ?? '').trim();
   if (!threadId || !text) return { ok: false, error: 'Write a message first.' };
   if (text.length > 4000) return { ok: false, error: 'That message is too long.' };
@@ -26,10 +31,21 @@ export async function postMessage(threadId: string, body: string): Promise<PostR
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: 'Not signed in.' };
 
-  const { error } = await supabase.from('messages').insert({ thread_id: threadId, sender_id: user.id, body: text });
+  const { error } = await supabase.from('messages').insert({
+    thread_id: threadId,
+    sender_id: user.id,
+    body: text,
+    ref_type: ref?.type ?? null,
+    ref_id: ref?.id ?? null,
+  });
   if (error) return { ok: false, error: missingTable(error.code) ? MIGRATION_HINT : 'Could not send. Please try again.' };
 
+  const h = await headers();
+  const origin = `${h.get('x-forwarded-proto') ?? 'https'}://${h.get('host') ?? ''}`;
+  await notifyThreadByEmail(threadId, user.id, text, origin).catch(() => null);
+
   revalidatePath('/messages');
+  revalidatePath('/my-messages');
   return { ok: true };
 }
 
