@@ -3,9 +3,11 @@
 // read-only context. Every query here runs through RLS — this page literally
 // cannot see anything the permission rules don't allow.
 
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { PageHeader } from '@/components/page-header';
 import { MyTaskRow, type MyTask } from '@/components/work/my-task-row';
+import { BrandLogo } from '@/components/brand-logo';
+import { unreadCount } from '@/lib/messages/queries';
 import { projectStatusMeta } from '@/lib/projects/status';
 import { fmtDate } from '@/lib/projects/format';
 import type { ProjectStatus, TaskStatus } from '@/types/database.types';
@@ -17,13 +19,15 @@ export default async function MyWorkPage() {
   } = await supabase.auth.getUser();
 
   // RLS scopes every one of these to the signed-in contractor's world.
-  const [{ data: assignments }, { data: projects }, { data: tasks }, { data: deliverables }, { data: milestones }] =
+  const [{ data: profile }, { data: assignments }, { data: projects }, { data: tasks }, { data: deliverables }, { data: milestones }, unread] =
     await Promise.all([
+      supabase.from('profiles').select('full_name').eq('id', user?.id ?? '').maybeSingle(),
       supabase.from('project_contractors').select('project_id, role'),
       supabase.from('projects').select('id, title, status, description, start_date, due_date').order('due_date', { nullsFirst: false }),
       supabase.from('tasks').select('id, project_id, title, status, priority, due_date, worker_note, assignee_id').order('due_date', { nullsFirst: false }),
       supabase.from('deliverables').select('id, project_id, title, status, due_date').order('due_date', { nullsFirst: false }),
       supabase.from('milestones').select('id, project_id, title, status, date').order('date'),
+      unreadCount(supabase),
     ]);
 
   const roleByProject = new Map((assignments ?? []).map((a) => [a.project_id, a.role]));
@@ -33,14 +37,42 @@ export default async function MyWorkPage() {
   // Standalone tasks assigned directly to me (not tied to one of my projects).
   const standalone = (tasks ?? []).filter((t) => my(t) && !projectList.some((p) => p.id === t.project_id));
 
+  const firstName = profile?.full_name?.split(' ')[0] || 'there';
+  const myOpenTasks = (tasks ?? []).filter((t) => my(t) && t.status !== 'done').length;
+  const today = new Date().toISOString().slice(0, 10);
+  const nextMilestone = (milestones ?? []).filter((m) => m.status !== 'done' && (!m.date || m.date >= today))[0] ?? null;
+
   return (
     <>
-      <PageHeader title="My Work" description="Your projects and tasks. Flip a status or leave a note as you go." />
+      {/* Home header — the team member's welcome, mirroring the client portal. */}
+      <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <BrandLogo size="md" tagline={false} />
+        <h1 className="mt-4 text-xl font-semibold text-ink">Welcome back, {firstName}</h1>
+        <p className="mt-0.5 text-sm text-slate-500">Your projects, tasks, and messages — all in one place.</p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Stat value={projectList.length} label={projectList.length === 1 ? 'project' : 'projects'} />
+          <Stat value={myOpenTasks} label="open tasks" />
+          <Link href="/my-messages" className="rounded-xl border border-slate-200 px-4 py-2 transition-colors hover:border-teal">
+            <span className="text-lg font-semibold text-ink">{unread}</span>
+            <span className="ml-1.5 text-xs text-slate-500">unread {unread === 1 ? 'message' : 'messages'} →</span>
+          </Link>
+          {nextMilestone && (
+            <div className="rounded-xl border border-slate-200 px-4 py-2">
+              <span className="text-xs text-slate-400">Next milestone</span>
+              <p className="text-sm font-medium text-ink">{nextMilestone.title}{fmtDate(nextMilestone.date) ? ` · ${fmtDate(nextMilestone.date)}` : ''}</p>
+            </div>
+          )}
+        </div>
+      </div>
 
       {projectList.length === 0 && standalone.length === 0 && (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 px-6 py-14 text-center">
-          <p className="text-sm text-slate-500">Nothing assigned to you yet.</p>
-          <p className="mt-1 text-sm text-slate-400">When Seaside Media puts you on a project, it shows up here.</p>
+          <p className="text-sm text-slate-500">No projects assigned yet.</p>
+          <p className="mt-1 text-sm text-slate-400">
+            When Seaside Media puts you on a project, it shows up here. In the meantime, you can{' '}
+            <Link href="/my-messages" className="text-sea hover:underline">check messages</Link> or{' '}
+            <Link href="/my-profile" className="text-sea hover:underline">update your profile</Link>.
+          </p>
         </div>
       )}
 
@@ -119,6 +151,15 @@ export default async function MyWorkPage() {
         })}
       </div>
     </>
+  );
+}
+
+function Stat({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="rounded-xl border border-slate-200 px-4 py-2">
+      <span className="text-lg font-semibold text-ink">{value}</span>
+      <span className="ml-1.5 text-xs text-slate-500">{label}</span>
+    </div>
   );
 }
 
