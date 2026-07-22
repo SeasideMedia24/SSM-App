@@ -6,6 +6,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient as createSupabaseServer } from '@/lib/supabase/server';
+import { ensureProjectMembership } from '@/lib/projects/assign';
 import type { TaskStatus, ContractStatus } from '@/types/database.types';
 
 export type PanelState = { error: string | null; ok?: number };
@@ -64,6 +65,18 @@ export async function deleteDeliverable(f: FormData) {
   const supabase = await db();
   await supabase.from('deliverables').delete().eq('id', id);
   refresh(projectId);
+}
+// Assign a deliverable to a team member; auto-adds them to the project.
+export async function setDeliverableAssignee(id: string, projectId: string, assigneeId: string | null) {
+  if (!id) return;
+  const supabase = await db();
+  if (assigneeId !== null) {
+    const okMember = await ensureProjectMembership(supabase, projectId, assigneeId);
+    if (!okMember) return;
+  }
+  await supabase.from('deliverables').update({ assignee_id: assigneeId }).eq('id', id);
+  refresh(projectId);
+  revalidatePath('/my-work');
 }
 
 // ── Contracts ────────────────────────────────────────────────────────────────

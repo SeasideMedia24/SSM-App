@@ -5,6 +5,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient as createSupabaseServer } from '@/lib/supabase/server';
 import { taskSchema, newTaskSchema, TASK_STATUS_VALUES } from '@/lib/validation/task';
+import { ensureProjectMembership } from '@/lib/projects/assign';
 import type { TaskStatus } from '@/types/database.types';
 
 export type TaskFormState = { error: string | null; ok?: number };
@@ -122,13 +123,10 @@ export async function setTaskAssignee(taskId: string, projectId: string, assigne
   const supabase = await createSupabaseServer();
 
   if (assigneeId !== null) {
-    // Only a linked team member's user id is a valid assignee.
-    const { data: contractor } = await supabase
-      .from('contractors')
-      .select('id')
-      .eq('user_id', assigneeId)
-      .maybeSingle();
-    if (!contractor) return;
+    // Only a linked team member's user id is a valid assignee — and assigning
+    // auto-adds them to the project so they can actually see the task.
+    const ok = await ensureProjectMembership(supabase, projectId, assigneeId);
+    if (!ok) return;
   }
 
   await supabase.from('tasks').update({ assignee_id: assigneeId }).eq('id', taskId);

@@ -12,11 +12,12 @@ import { useUndo } from '@/components/undo/undo-provider';
 import { TASK_STATUSES, CONTRACT_STATUSES } from '@/lib/projects/status';
 import { money, fmtDate } from '@/lib/projects/format';
 import {
-  addDeliverable, setDeliverableStatus, deleteDeliverable,
+  addDeliverable, setDeliverableStatus, deleteDeliverable, setDeliverableAssignee,
   addContract, setContractStatus, deleteContract,
   addMilestone, setMilestoneStatus, deleteMilestone,
   type PanelState,
 } from '@/app/(app)/projects/[id]/actions';
+import type { AssigneeOption } from '@/components/projects/tasks-panel';
 import type { Database, TaskStatus, ContractStatus } from '@/types/database.types';
 
 type Deliverable = Database['public']['Tables']['deliverables']['Row'];
@@ -91,7 +92,7 @@ function ListWrap({ children }: { children: React.ReactNode }) {
 }
 
 // ── Deliverables ─────────────────────────────────────────────────────────────
-export function DeliverablesPanel({ projectId, items }: { projectId: string; items: Deliverable[] }) {
+export function DeliverablesPanel({ projectId, items, assignees = [] }: { projectId: string; items: Deliverable[]; assignees?: AssigneeOption[] }) {
   const [state, action] = useActionState<PanelState, FormData>(addDeliverable.bind(null, projectId), { error: null });
   const ref = useResettableForm(state);
   return (
@@ -104,7 +105,19 @@ export function DeliverablesPanel({ projectId, items }: { projectId: string; ite
       </form>
       {items.length === 0 ? <EmptyBox>No deliverables yet.</EmptyBox> : (
         <ListWrap>
-          {items.map((d) => <StatusRow key={d.id} id={d.id} projectId={projectId} title={d.title} status={d.status} due={d.due_date} onStatus={setDeliverableStatus} onDelete={deleteDeliverable} />)}
+          {items.map((d) => (
+            <StatusRow
+              key={d.id}
+              id={d.id}
+              projectId={projectId}
+              title={d.title}
+              status={d.status}
+              due={d.due_date}
+              onStatus={setDeliverableStatus}
+              onDelete={deleteDeliverable}
+              assignee={{ options: assignees, value: d.assignee_id, onAssign: setDeliverableAssignee }}
+            />
+          ))}
         </ListWrap>
       )}
     </div>
@@ -133,9 +146,11 @@ export function TimelinePanel({ projectId, items }: { projectId: string; items: 
 }
 
 // Shared row for deliverables & milestones (status + title + date + delete).
-function StatusRow({ id, projectId, title, status, due, onStatus, onDelete }: {
+// An optional assignee picker shows only when `assignee` is provided (deliverables).
+function StatusRow({ id, projectId, title, status, due, onStatus, onDelete, assignee }: {
   id: string; projectId: string; title: string; status: TaskStatus; due: string | null;
   onStatus: (id: string, projectId: string, s: TaskStatus) => void; onDelete: (f: FormData) => void;
+  assignee?: { options: AssigneeOption[]; value: string | null; onAssign: (id: string, projectId: string, userId: string | null) => void };
 }) {
   const [pending, start] = useTransition();
   const undo = useUndo();
@@ -150,10 +165,24 @@ function StatusRow({ id, projectId, title, status, due, onStatus, onDelete }: {
     });
   }
 
+  const showAssignee = assignee && (assignee.options.length > 0 || assignee.value != null);
+
   return (
     <li className="flex items-center gap-3 px-3 py-2.5">
       <StatusSelect value={status} disabled={pending} onChange={changeStatus} />
       <span className={`flex-1 text-sm ${status === 'done' ? 'text-slate-400 line-through' : 'text-ink'}`}>{title}</span>
+      {showAssignee && (
+        <select
+          value={assignee!.value ?? ''}
+          disabled={pending}
+          onChange={(e) => start(() => assignee!.onAssign(id, projectId, e.target.value || null))}
+          className="max-w-[8.5rem] rounded-md border border-slate-200 bg-white px-1.5 py-1 text-xs text-slate-600 outline-none focus:border-teal"
+          aria-label="Assignee"
+        >
+          <option value="">Unassigned</option>
+          {assignee!.options.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+      )}
       {d && <span className="text-[11px] text-slate-400">{d}</span>}
       <DeleteInline action={onDelete} id={id} projectId={projectId} />
     </li>

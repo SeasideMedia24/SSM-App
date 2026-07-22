@@ -86,6 +86,10 @@ export default async function ProjectDetailPage({
   const meta = projectStatusMeta(project.status);
   const cl = client(project.clients as ClientRel);
   const taskList = tasks ?? [];
+  // Linked team members — the assignable people for this project's tasks/deliverables.
+  const assignees = (teamLogins ?? [])
+    .filter((t): t is { name: string; user_id: string } => t.user_id != null)
+    .map((t) => ({ id: t.user_id, name: t.name }));
 
   const pricing: PricingContext = {
     roles: roles ?? [],
@@ -140,15 +144,9 @@ export default async function ProjectDetailPage({
       <ViewSwitcher active={view} />
 
       {view === 'tasks' && (
-        <TasksPanel
-          projectId={project.id}
-          tasks={taskList}
-          assignees={(teamLogins ?? [])
-            .filter((t): t is { name: string; user_id: string } => t.user_id != null)
-            .map((t) => ({ id: t.user_id, name: t.name }))}
-        />
+        <TasksPanel projectId={project.id} tasks={taskList} assignees={assignees} />
       )}
-      {view === 'deliverables' && <DeliverablesPanel projectId={project.id} items={deliverables ?? []} />}
+      {view === 'deliverables' && <DeliverablesPanel projectId={project.id} items={deliverables ?? []} assignees={assignees} />}
       {view === 'contracts' && <ContractsPanel projectId={project.id} items={contracts ?? []} />}
       {view === 'budget' && <QuoteBudget rows={budgetRows} />}
 
