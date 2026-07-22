@@ -1,0 +1,96 @@
+// Shared message queries — used by BOTH the owner's /messages page and the
+// team's /messages page. RLS does the real scoping (each viewer only ever sees
+// threads can_access_thread allows), so these stay thin.
+
+import 'server-only';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/types/database.types';
+
+type DB = SupabaseClient<Database>;
+
+export type ThreadSummary = {
+  id: string;
+  kind: 'project' | 'dm';
+  title: string;          // project title, or the other person's name
+  lastBody: string | null;
+  lastAt: string | null;
+  unread: boolean;
+};
+
+export type ThreadMessage = {
+  id: string;
+  body: string;
+  createdAt: string;
+  mine: boolean;
+  senderName: string;
+};
+
+// Every thread the viewer can see, newest activity first, with an unread flag.
+export async function listThreads(supabase: DB, viewerId: string): Promise<ThreadSummary[]> {
+  const { data: threads } = await supabase
+    .from('threads')
+    .select('id, kind, project_id, created_at, projects ( title ), thread_participants ( user_id, last_read_at, profiles ( full_name ) )')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (!threads || threads.length === 0) return [];
+
+  // Latest message per thread (one query; threads are few at this scale).
+  const ids = threads.map((t) => t.id);
+  const { data: lasts } = await supabase
+    .from('messages')
+    .select('thread_id, body, created_at, sender_id')
+    .in('thread_id', ids)
+    .order('created_at', { ascending: false })
+    .limit(400);
+  const lastByThread = new Map<string, { body: string; created_at: string; sender_id: string }>();
+  for (const m of lasts ?? []) if (!lastByThread.has(m.thread_id)) lastByThread.set(m.thread_id, m);
+
+  const rows = threads.map((t) => {
+    const parts = (t.thread_participants ?? []) as { user_id: string; last_read_at: string | null; profiles: { full_name: string | null } | { full_name: string | null }[] | null }[];
+    const mine = parts.find((p) => p.user_id === viewerId);
+    const others = parts.filter((p) => p.user_id !== viewerId);
+    const otherName = others
+      .map((p) => (Array.isArray(p.profiles) ? p.profiles[0]?.full_name : p.profiles?.full_name))
+      .filter(Boolean)[0] as string | undefined;
+    const project = t.projects as unknown as { title: string } | { title: string }[] | null;
+    const projectTitle = Array.isArray(project) ? project[0]?.title : project?.title;
+    const last = lastByThread.get(t.id) ?? null;
+    const unread = !!last && last.sender_id !== viewerId && (!mine?.last_read_at || last.created_at > mine.last_read_at);
+    return {
+      id: t.id,
+      kind: t.kind as 'project' | 'dm',
+      title: t.kind === 'project' ? (projectTitle ?? 'Project') : (otherName ?? 'Direct message'),
+      lastBody: last?.body ?? null,
+      lastAt: last?.created_at ?? t.created_at,
+      unread,
+    };
+  });
+  // Newest activity first.
+  return rows.sort((a, b) => ((a.lastAt ?? '') < (b.lastAt ?? '') ? 1 : -1));
+}
+
+export async function getThreadMessages(supabase: DB, threadId: string, viewerId: string): Promise<ThreadMessage[]> {
+  const { data } = await supabase
+    .from('messages')
+    .select('id, body, created_at, sender_id, profiles ( full_name )')
+    .eq('thread_id', threadId)
+    .order('created_at')
+    .limit(500);
+  return (data ?? []).map((m) => {
+    const prof = m.profiles as unknown as { full_name: string | null } | { full_name: string | null }[] | null;
+    const name = Array.isArray(prof) ? prof[0]?.full_name : prof?.full_name;
+    return {
+      id: m.id,
+      body: m.body,
+      createdAt: m.created_at,
+      mine: m.sender_id === viewerId,
+      senderName: name ?? 'Someone',
+    };
+  });
+}
+
+export async function unreadCount(supabase: DB): Promise<number> {
+  const { data, error } = await supabase.rpc('unread_message_count');
+  if (error) return 0; // pre-migration → no badge
+  return data ?? 0;
+}

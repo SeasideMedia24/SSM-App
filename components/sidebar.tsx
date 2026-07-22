@@ -39,6 +39,7 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   { href: '/my-tasks', label: 'My Tasks', icon: <IconCheck /> },
+  { href: '/messages', label: 'Messages', icon: <IconChat /> },
   { href: '/brainstorm', label: 'Brainstorming', icon: <IconSpark /> },
   { href: '/calculator', label: 'Calculator', icon: <IconCalc /> },
   { href: '/invoices', label: 'Invoices', icon: <IconReceipt /> },
@@ -257,6 +258,13 @@ function IconStack() {
   return (
     <svg {...iconProps()}>
       <path d="M12 3 3 8l9 5 9-5-9-5Z" /><path d="m3 13 9 5 9-5" />
+    </svg>
+  );
+}
+function IconChat() {
+  return (
+    <svg {...iconProps()}>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </svg>
   );
 }

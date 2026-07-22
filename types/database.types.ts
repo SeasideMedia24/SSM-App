@@ -657,6 +657,102 @@ export type Database = {
           },
         ];
       };
+      threads: {
+        Row: {
+          id: string;
+          kind: 'project' | 'dm';
+          project_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          kind: 'project' | 'dm';
+          project_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          kind?: 'project' | 'dm';
+          project_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'threads_project_id_fkey';
+            columns: ['project_id'];
+            referencedRelation: 'projects';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      thread_participants: {
+        Row: {
+          thread_id: string;
+          user_id: string;
+          last_read_at: string | null;
+        };
+        Insert: {
+          thread_id: string;
+          user_id: string;
+          last_read_at?: string | null;
+        };
+        Update: {
+          thread_id?: string;
+          user_id?: string;
+          last_read_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'thread_participants_thread_id_fkey';
+            columns: ['thread_id'];
+            referencedRelation: 'threads';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'thread_participants_user_id_fkey';
+            columns: ['user_id'];
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      messages: {
+        Row: {
+          id: string;
+          thread_id: string;
+          sender_id: string;
+          body: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          thread_id: string;
+          sender_id: string;
+          body: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          thread_id?: string;
+          sender_id?: string;
+          body?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'messages_thread_id_fkey';
+            columns: ['thread_id'];
+            referencedRelation: 'threads';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'messages_sender_id_fkey';
+            columns: ['sender_id'];
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       paepae_actions: {
         Row: {
           id: string;
@@ -1269,7 +1365,16 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      unread_message_count: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
+      my_clearance: {
+        Args: { pid: string };
+        Returns: number;
+      };
+    };
     Enums: {
       project_status: ProjectStatus;
       para_category: ParaCategory;

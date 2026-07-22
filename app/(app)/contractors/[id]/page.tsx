@@ -8,6 +8,7 @@ import { OnboardLinkControl } from '@/components/contractors/onboard-link-contro
 import { InviteLoginControl } from '@/components/contractors/invite-login-control';
 import { ClearancePicker, AssignmentClearancePicker } from '@/components/contractors/clearance-picker';
 import { assignProject, unassignProject } from '../actions';
+import { openDm } from '@/app/(app)/messages/actions';
 import { contractorTypeMeta } from '@/lib/projects/status';
 import { money, contractorRatesSummary } from '@/lib/projects/format';
 import type { ContractorType } from '@/types/database.types';
@@ -50,6 +51,11 @@ export default async function ContractorDetailPage({
         title={contractor.name}
         action={
           <div className="flex items-center gap-2">
+            {contractor.user_id && (
+              <form action={openDm.bind(null, contractor.user_id)}>
+                <button type="submit" className={buttonClass('primary', 'sm')}>Message</button>
+              </form>
+            )}
             <Link href={`/contractors/${contractor.id}/edit`} className={buttonClass('secondary', 'sm')}>Edit</Link>
             <DeleteContractorButton contractorId={contractor.id} />
           </div>

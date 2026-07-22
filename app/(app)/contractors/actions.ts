@@ -100,6 +100,11 @@ export async function assignProject(formData: FormData) {
     { onConflict: 'project_id,contractor_id' },
   );
 
+  // Every project with a team gets its discussion thread (idempotent; tolerant
+  // of the messages migration not having run yet).
+  const { ensureProjectThread } = await import('@/app/(app)/messages/actions');
+  await ensureProjectThread(projectId).catch(() => null);
+
   revalidatePath(`/contractors/${contractorId}`);
   revalidatePath(`/projects/${projectId}`);
 }
