@@ -1,16 +1,16 @@
-import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
 import { proj, type ProjRel } from '@/components/projects/global-table';
 import { PaepaeActivity, type PaepaeAction } from '@/components/dashboard/paepae-activity';
+import { RecentQuotes } from '@/components/dashboard/recent-quotes';
 import { DashboardMetrics, type MetricDef, type MetricItem } from '@/components/dashboard/metrics';
 import { CalendarBlock, type CalendarItem, type CalendarSource, type GoogleStatus } from '@/components/dashboard/calendar-block';
 import { parseAnchor, parseView, parseHidden, rangeForView, todayInTz } from '@/lib/dashboard/calendar';
 import { syncGoogleEvents } from '@/lib/google/calendar';
-import { fmtDate, money } from '@/lib/projects/format';
-import { quoteStatusMeta, projectStatusMeta } from '@/lib/projects/status';
-import type { QuoteStatus, ProjectStatus } from '@/types/database.types';
+import { fmtDate } from '@/lib/projects/format';
+import { projectStatusMeta } from '@/lib/projects/status';
+import type { ProjectStatus } from '@/types/database.types';
 
 export default async function DashboardPage({
   searchParams,
@@ -19,13 +19,11 @@ export default async function DashboardPage({
 }) {
   const { cal, view: viewParam, hide: hideParam } = await searchParams;
   const supabase = await createClient();
-  const now = new Date();
 
   // The viewer's timezone (set by the TimezoneCookie in the app layout) so
   // Google times render in the viewer's own zone; defaults to the studio's.
   const tz = (await cookies()).get('ssm_tz')?.value || 'America/New_York';
   const today = todayInTz(tz);
-  const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString();
 
   // Calendar block state: which view (month/week/day), which sources are hidden,
   // and the date it's centred on — all from the URL so it's linkable.
@@ -47,17 +45,22 @@ export default async function DashboardPage({
     { data: calMilestones },
     { data: calProjects },
   ] = await Promise.all([
-    supabase.from('tasks').select('id, title, due_date, projects(id, title)').lt('due_date', today).neq('status', 'done').order('due_date'),
+    // Overdue tasks: archived tasks don't count — archiving is "out of my face".
+    supabase.from('tasks').select('id, title, due_date, projects(id, title)').lt('due_date', today).neq('status', 'done').is('archived_at', null).order('due_date'),
     supabase.from('deliverables').select('id, title, due_date, projects(id, title)').lt('due_date', today).neq('status', 'done').order('due_date'),
     supabase.from('milestones').select('id, title, date, projects(id, title)').gte('date', today).order('date').limit(8),
     supabase.from('projects').select('id, title, status, due_date').neq('status', 'archived').order('due_date', { nullsFirst: false }),
-    supabase.from('quotes').select('id, title, status, total, clients ( name )').order('created_at', { ascending: false }).limit(5),
+    // Recent quotes (dashboard list): newest first, enough rows to fill the
+    // visible 10 plus the collapsed archive. dashboard_archived_at hides a quote
+    // from HERE only — the Calculator's saved list is untouched.
+    supabase.from('quotes').select('id, title, status, total, dashboard_archived_at, clients ( name )').order('created_at', { ascending: false }).limit(40),
     // Overdue invoices = sent and past due. Tolerant of the table not existing
     // yet (pre-migration) — the error is ignored and treated as empty.
     supabase.from('invoices').select('id, invoice_number, title, total, due_date, clients ( name )').eq('status', 'sent').lt('due_date', today).order('due_date'),
-    // PaePae's recent confirmed actions. Tolerant of the table not existing yet
-    // (before the migration is applied) — the query just returns an error we ignore.
-    supabase.from('paepae_actions').select('id, action, summary, result, created_at').gte('created_at', fiveDaysAgo).order('created_at', { ascending: false }).limit(20),
+    // PaePae's confirmed actions: newest 10 unarchived show; the rest fold into
+    // the archive. Tolerant of the table not existing yet (pre-migration) — the
+    // query just returns an error we ignore.
+    supabase.from('paepae_actions').select('id, action, summary, result, created_at, archived_at').order('created_at', { ascending: false }).limit(50),
     // Calendar block: everything dated inside the displayed month.
     supabase.from('tasks').select('id, title, status, due_date, project_id').gte('due_date', calFirst).lte('due_date', calLast),
     supabase.from('deliverables').select('id, title, status, due_date, project_id').gte('due_date', calFirst).lte('due_date', calLast),
@@ -69,7 +72,24 @@ export default async function DashboardPage({
   const oDeliv = overdueDeliverables ?? [];
   const up = upcoming ?? [];
   const projectsList = activeProjects ?? [];
-  const paepaeLog = (paepaeActions ?? []) as PaepaeAction[];
+
+  // Split both dashboard lists: newest 10 unarchived are visible; everything
+  // else (manually archived + overflow) folds into the collapsed Archive.
+  const VISIBLE = 10;
+  const paepaeAll = (paepaeActions ?? []) as (PaepaeAction & { archived_at?: string | null })[];
+  const paepaeFresh = paepaeAll.filter((a) => !a.archived_at);
+  const paepaeLog = paepaeFresh.slice(0, VISIBLE);
+  const paepaeArchive = [...paepaeAll.filter((a) => a.archived_at), ...paepaeFresh.slice(VISIBLE)]
+    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+
+  const quotesAll = (recentQuotes ?? []).map((q) => ({
+    id: q.id, title: q.title, status: q.status as string, total: q.total,
+    clientName: (q.clients as unknown as { name: string } | null)?.name ?? null,
+    archived: !!(q as { dashboard_archived_at?: string | null }).dashboard_archived_at,
+  }));
+  const quotesFresh = quotesAll.filter((q) => !q.archived);
+  const quotesVisible = quotesFresh.slice(0, VISIBLE);
+  const quotesArchive = [...quotesAll.filter((q) => q.archived), ...quotesFresh.slice(VISIBLE)];
 
   // Build the clickable KPI row. Each metric carries the items behind its number
   // so clicking it can expand an inline list.
@@ -192,32 +212,12 @@ export default async function DashboardPage({
       <DashboardMetrics metrics={metrics} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Panel title="PaePae · last 5 days">
-          <PaepaeActivity actions={paepaeLog} />
+        <Panel title="PaePae activity">
+          <PaepaeActivity actions={paepaeLog} archived={paepaeArchive} />
         </Panel>
 
         <Panel title="Recent quotes">
-          {!recentQuotes || recentQuotes.length === 0 ? (
-            <Empty>
-              No quotes yet — build one in the{' '}
-              <Link href="/calculator" className="text-sea underline">Price Calculator</Link>.
-            </Empty>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {recentQuotes.map((q) => {
-                const meta = quoteStatusMeta(q.status as QuoteStatus);
-                const clientName = (q.clients as unknown as { name: string } | null)?.name;
-                return (
-                  <li key={q.id} className="flex items-center gap-3 py-2 text-sm">
-                    <Link href={`/calculator?quote=${q.id}`} className="text-ink hover:underline">{q.title}</Link>
-                    {clientName && <span className="text-xs text-slate-500">{clientName}</span>}
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${meta.pill}`}>{meta.label}</span>
-                    <span className="ml-auto font-medium text-slate-700">{money(q.total)}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+          <RecentQuotes quotes={quotesVisible} archived={quotesArchive} />
         </Panel>
       </div>
 
@@ -246,6 +246,3 @@ function Panel({ title, accent, children }: { title: string; accent?: 'warn'; ch
   );
 }
 
-function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="py-2 text-sm text-slate-400">{children}</p>;
-}

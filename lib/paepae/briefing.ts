@@ -120,12 +120,14 @@ export async function getBriefing(supabase: DB, today: string): Promise<Briefing
   const horizon = addDays(today, HORIZON_DAYS);
 
   const [{ data: tasks }, { data: projects }, { data: quotes }, { data: invoices }, { count: inquiryCount }] = await Promise.all([
-    // Only pull tasks we'll actually bucket: not done, dated, and due on or
-    // before the horizon (overdue tasks are <= horizon too).
+    // Only pull tasks we'll actually bucket: not done, not archived, dated, and
+    // due on or before the horizon (overdue tasks are <= horizon too). Archived
+    // tasks never count — archiving means "out of my face" everywhere.
     supabase
       .from('tasks')
       .select('id, title, due_date, priority, projects(title)')
       .neq('status', 'done')
+      .is('archived_at', null)
       .not('due_date', 'is', null)
       .lte('due_date', horizon)
       .order('due_date'),

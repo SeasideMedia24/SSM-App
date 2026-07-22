@@ -3,8 +3,10 @@
 // next to the data (defense in depth — CLAUDE.md security posture).
 
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getAppRole } from '@/lib/auth/role';
+import { todayInTz } from '@/lib/dashboard/calendar';
 import { Sidebar } from '@/components/sidebar';
 import { UndoProvider } from '@/components/undo/undo-provider';
 import { PaepaeDock } from '@/components/paepae/paepae-dock';
@@ -33,7 +35,12 @@ export default async function AppLayout({
   // Notification counts for the menu badges. head:true fetches only counts (no
   // rows), so this stays cheap. More sources (PaePae updates, team messages)
   // join this list when messaging lands.
-  const today = new Date().toISOString().slice(0, 10);
+  //
+  // "Today" is computed in the VIEWER'S timezone (same as the dashboard) — with
+  // plain UTC the badge flipped tasks to overdue hours early in the evening.
+  // Archived tasks never count as overdue (archiving means "out of my face").
+  const tz = (await cookies()).get('ssm_tz')?.value || 'America/New_York';
+  const today = todayInTz(tz);
   const [{ count: newInquiries }, { count: overdueTasks }] = await Promise.all([
     supabase
       .from('onboarding_submissions')
@@ -43,7 +50,8 @@ export default async function AppLayout({
       .from('tasks')
       .select('id', { count: 'exact', head: true })
       .lt('due_date', today)
-      .neq('status', 'done'),
+      .neq('status', 'done')
+      .is('archived_at', null),
   ]);
 
   // Keyed by nav href — the sidebar shows a count pill on matching entries

@@ -11,6 +11,7 @@
 
 import 'server-only';
 import { z } from 'zod';
+import { todayInTz } from '@/lib/dashboard/calendar';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
@@ -262,10 +263,12 @@ type ToolInput = Record<string, unknown>;
 // Executes one tool call and returns a compact JSON string for the model.
 // Throws on unknown tools / query errors; the caller turns that into an
 // is_error tool_result so PaePae can recover gracefully.
-export async function runTool(name: string, input: ToolInput, supabase: DB): Promise<string> {
+// `tz` is the viewer's timezone (from the ssm_tz cookie) so "today" matches the
+// dashboard — plain UTC flipped tasks to overdue hours early in the evening.
+export async function runTool(name: string, input: ToolInput, supabase: DB, tz = 'America/New_York'): Promise<string> {
   switch (name) {
     case 'get_briefing': {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayInTz(tz);
       const briefing = await getBriefing(supabase, today);
       return JSON.stringify(briefing);
     }

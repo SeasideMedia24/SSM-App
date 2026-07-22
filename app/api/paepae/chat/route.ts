@@ -80,6 +80,10 @@ export async function POST(req: NextRequest) {
     return new Response('PaePae is only available to the owner.', { status: 403 });
   }
 
+  // Viewer timezone (same cookie the dashboard uses) so PaePae's "today"
+  // matches what the owner sees on screen.
+  const tz = req.cookies.get('ssm_tz')?.value || 'America/New_York';
+
   // 2. Validate input server-side (never trust the client).
   let json: unknown;
   try {
@@ -212,7 +216,7 @@ export async function POST(req: NextRequest) {
               // A read tool.
               emit({ t: 'lookup', label: LOOKUP_LABELS[block.name] ?? `Ran ${block.name}` });
               try {
-                const out = await runTool(block.name, input, supabase);
+                const out = await runTool(block.name, input, supabase, tz);
                 toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: out });
               } catch (err) {
                 const message = err instanceof Error ? err.message : 'lookup failed';
