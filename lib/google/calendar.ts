@@ -183,7 +183,7 @@ export async function syncCalendarList(supabase: DB, userId: string): Promise<vo
 
 // ── Events ───────────────────────────────────────────────────────────────────
 
-type RawEvent = {
+export type RawEvent = {
   id?: string;
   status?: string;
   summary?: string;
@@ -247,7 +247,7 @@ export async function syncGoogleEvents(
         const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
         if (!res.ok) return [];
         const json = (await res.json()) as { items?: RawEvent[] };
-        return (json.items ?? []).flatMap((ev) => normalize(ev, cal, firstIso, lastIso));
+        return (json.items ?? []).flatMap((ev) => normalize(ev, cal, firstIso, lastIso, tz));
       }),
     );
     return { status: 'ok', events: perCalendar.flat() };
@@ -256,12 +256,31 @@ export async function syncGoogleEvents(
   }
 }
 
+// Convert an ISO datetime (with any offset — Z, -04:00, whatever Google sent)
+// into the VIEWER's wall-clock day + hh:mm. This makes the calendar immune to
+// Google ignoring/partially honouring the timeZone request param, which is the
+// classic source of "event shows on the wrong day" for late-evening events.
+function wallClockInTz(iso: string, tz: string): { dayIso: string; hm: string } | null {
+  const t = new Date(iso);
+  if (Number.isNaN(t.getTime())) return null;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(t);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+  const hour = get('hour') === '24' ? '00' : get('hour'); // some ICU builds emit "24"
+  return { dayIso: `${get('year')}-${get('month')}-${get('day')}`, hm: `${hour}:${get('minute')}` };
+}
+
 // Expand one raw Google event into per-day calendar entries within the range.
-function normalize(
+// Exported for tests.
+export function normalize(
   ev: RawEvent,
   cal: { id: string; summary: string; color: string | null; merge_ssm: boolean },
   firstIso: string,
   lastIso: string,
+  tz = 'America/New_York',
 ): GoogleEvent[] {
   if (!ev.id || ev.status === 'cancelled') return [];
   const title = ev.summary?.trim() || '(untitled)';
@@ -286,21 +305,24 @@ function normalize(
     return out;
   }
 
-  // Timed: bucket on the event's own local start date.
+  // Timed: convert the actual instant into the viewer's wall-clock and bucket
+  // on THAT day. (Previously we sliced the string raw, trusting Google to have
+  // returned it in the viewer's zone — which it doesn't always do.)
   if (ev.start?.dateTime) {
-    const dayIso = ev.start.dateTime.slice(0, 10);
-    if (dayIso < firstIso || dayIso > lastIso) return [];
-    const startHm = ev.start.dateTime.slice(11, 16);
-    const sameDayEnd = ev.end?.dateTime?.slice(0, 10) === dayIso ? ev.end?.dateTime : undefined;
-    const startMin = minutesOf(startHm);
-    const endMin = sameDayEnd ? minutesOf(sameDayEnd.slice(11, 16)) : 24 * 60;
+    const start = wallClockInTz(ev.start.dateTime, tz);
+    if (!start) return [];
+    if (start.dayIso < firstIso || start.dayIso > lastIso) return [];
+    const end = ev.end?.dateTime ? wallClockInTz(ev.end.dateTime, tz) : null;
+    const sameDayEnd = end && end.dayIso === start.dayIso ? end : null;
+    const startMin = minutesOf(start.hm);
+    const endMin = sameDayEnd ? minutesOf(sameDayEnd.hm) : 24 * 60;
     return [{
       ...base,
-      dayIso,
+      dayIso: start.dayIso,
       allDay: false,
       startMin,
       endMin: Math.max(endMin, startMin + 15), // floor so short events stay visible
-      timeLabel: timeLabelOf(startHm),
+      timeLabel: timeLabelOf(start.hm),
     }];
   }
 
