@@ -11,7 +11,7 @@
 // A project can have many quotes; they are all kept and all counted. The maths
 // lives here so the per-project view and the all-projects Budgets page agree.
 
-import { computeCost, computeCostLines, type CalculatorSelections, type PricingConfig } from '@/lib/pricing/engine';
+import { computeCost, computeCostLines, type CalculatorSelections, type PricingConfig, type LineDetail } from '@/lib/pricing/engine';
 import type { QuoteStatus } from '@/types/database.types';
 
 // The pricing rate tables, passed straight through to computeCost. Typed off
@@ -32,8 +32,10 @@ export type BudgetQuote = {
   created_at: string;
 };
 
-// One line of the cost breakdown, ready to render (label + cost amount).
-export type BudgetCostLine = { label: string; amount: number };
+// One line of the cost breakdown, ready to render. `detail` carries the
+// structured units (days / half days / hours / page-min / qty) so the budget
+// table can show them as flush columns instead of one crammed label.
+export type BudgetCostLine = { label: string; amount: number; detail?: LineDetail };
 
 export type QuoteBudgetRow = {
   id: string;
@@ -59,6 +61,7 @@ export function quoteBudgetRow(quote: BudgetQuote, ctx: PricingContext): QuoteBu
     costLines = computeCostLines(state, ctx.roles, ctx.services, ctx.config).lines.map((l) => ({
       label: l.label,
       amount: l.amount,
+      detail: l.detail,
     }));
   }
   return { id: quote.id, title: quote.title, status: quote.status, createdAt: quote.created_at, charge, cost, margin, costLines };

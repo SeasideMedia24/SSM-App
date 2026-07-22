@@ -72,25 +72,44 @@ export function QuoteBudget({ rows }: { rows: QuoteBudgetRow[] }) {
         />
       </div>
 
-      {/* Itemised cost basis — what it costs to deliver, no markup or discount. */}
+      {/* Itemised cost basis — what it costs to deliver, no markup or discount.
+          Units render as flush columns (the engine supplies structured detail). */}
       {cur.costLines.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-slate-200">
-          <div className="flex items-center justify-between bg-slate-50 px-3 py-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Cost breakdown</span>
-            <span className="text-[11px] text-slate-400">what it costs to deliver — no markup</span>
-          </div>
-          <ul className="divide-y divide-slate-100">
-            {cur.costLines.map((line, i) => (
-              <li key={i} className="flex items-center justify-between px-3 py-2 text-sm">
-                <span className="text-slate-700">{line.label}</span>
-                <span className="text-slate-600">{money(line.amount)}</span>
-              </li>
-            ))}
-            <li className="flex items-center justify-between bg-slate-50 px-3 py-2 text-sm font-semibold text-ink">
-              <span>Total cost</span>
-              <span>{cur.cost != null ? money(cur.cost) : '—'}</span>
-            </li>
-          </ul>
+        <div className="overflow-x-auto rounded-xl border border-slate-200">
+          <table className="w-full min-w-[34rem] text-sm">
+            <thead>
+              <tr className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-3 py-2 font-semibold">
+                  Cost breakdown <span className="ml-1 font-normal normal-case tracking-normal text-slate-400">no markup</span>
+                </th>
+                <th className="w-14 px-2 py-2 text-right font-semibold">Days</th>
+                <th className="w-14 px-2 py-2 text-right font-semibold">Half</th>
+                <th className="w-14 px-2 py-2 text-right font-semibold">Hrs</th>
+                <th className="w-16 px-2 py-2 text-right font-semibold">Pg-min</th>
+                <th className="w-12 px-2 py-2 text-right font-semibold">Qty</th>
+                <th className="w-24 px-3 py-2 text-right font-semibold">Cost</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {cur.costLines.map((line, i) => (
+                <tr key={i}>
+                  <td className="px-3 py-2 text-slate-700">{itemName(line)}</td>
+                  <Num v={line.detail?.fullDays} />
+                  <Num v={line.detail?.halfDays} />
+                  <Num v={line.detail?.hours} />
+                  <Num v={line.detail?.pageMinutes} wide />
+                  <Num v={line.detail?.quantity} />
+                  <td className="px-3 py-2 text-right tabular-nums text-slate-600">{money(line.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="bg-slate-50 font-semibold text-ink">
+                <td className="px-3 py-2" colSpan={6}>Total cost</td>
+                <td className="px-3 py-2 text-right tabular-nums">{cur.cost != null ? money(cur.cost) : '—'}</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       )}
 
@@ -101,6 +120,22 @@ export function QuoteBudget({ rows }: { rows: QuoteBudgetRow[] }) {
         </Link>
       </div>
     </div>
+  );
+}
+
+// With units in their own columns, the label's " — 2 days, 1 half day" / "×3"
+// suffixes are redundant — show just the item name for detailed lines.
+function itemName(line: { label: string; detail?: unknown }): string {
+  if (!line.detail) return line.label;
+  return line.label.split(' — ')[0].replace(/\s*×\d+$/, '');
+}
+
+// One right-aligned numeric cell; em-dash when the unit doesn't apply.
+function Num({ v, wide }: { v: number | undefined; wide?: boolean }) {
+  return (
+    <td className={`${wide ? 'w-16' : 'w-14'} px-2 py-2 text-right tabular-nums ${v ? 'text-slate-600' : 'text-slate-300'}`}>
+      {v || '—'}
+    </td>
   );
 }
 

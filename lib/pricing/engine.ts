@@ -55,7 +55,18 @@ export type CalculatorSelections = {
   permits: number;
 };
 
-export type QuoteLine = { label: string; quantity: number; unit: string | null; rate: number; amount: number };
+// Structured breakdown behind a cost line — how MUCH of each unit the amount
+// covers. The budget view renders these as flush columns (days/half/hrs/pg-min/
+// qty) instead of cramming everything into the label string.
+export type LineDetail = {
+  fullDays?: number;
+  halfDays?: number;
+  hours?: number;
+  pageMinutes?: number;
+  quantity?: number; // ×N (crew qty, shorts, permits)
+};
+
+export type QuoteLine = { label: string; quantity: number; unit: string | null; rate: number; amount: number; detail?: LineDetail };
 
 export type QuoteBreakdown = {
   lines: QuoteLine[];
@@ -91,6 +102,28 @@ function roleCost(role: RoleRates, sel: { quantity: number; booking?: Photograph
     return rate * qty;
   }
   return (s.fullDays * role.day_rate + s.halfDays * role.half_rate + s.hours * role.hour_rate) * qty;
+}
+
+// Structured unit breakdown for a crew line (mirrors roleCost's math) — what
+// the budget view shows in its Days / Half / Hrs / Qty columns.
+function roleDetail(role: RoleRates, sel: { quantity: number; booking?: PhotographerBooking }, s: CalculatorSelections): LineDetail {
+  const quantity = role.has_quantity && sel.quantity > 1 ? sel.quantity : undefined;
+  if (role.kind === 'drone') return { hours: s.droneHours || undefined, quantity };
+  if (role.kind === 'photographer') {
+    const booking = sel.booking ?? 'half';
+    return {
+      fullDays: booking === 'day' ? 1 : undefined,
+      halfDays: booking === 'half' ? 1 : undefined,
+      hours: booking === 'hourly' ? 1 : undefined,
+      quantity,
+    };
+  }
+  return {
+    fullDays: s.fullDays || undefined,
+    halfDays: s.halfDays || undefined,
+    hours: s.hours || undefined,
+    quantity,
+  };
 }
 
 // Human label for the quote line, e.g. "DP — 2 days, 1 half day".
@@ -224,7 +257,7 @@ export function computeCostLines(
     if (!sel) continue;
     const cost = r2(roleCost(role, sel, s));
     if (cost <= 0) continue;
-    lines.push({ label: roleLineLabel(role, sel, s), quantity: 1, unit: null, rate: cost, amount: cost });
+    lines.push({ label: roleLineLabel(role, sel, s), quantity: 1, unit: null, rate: cost, amount: cost, detail: roleDetail(role, sel, s) });
   }
 
   if (s.rental !== 'none') {
@@ -237,7 +270,7 @@ export function computeCostLines(
     if (!selected.has(svc.id)) continue;
     const cost = r2(s.pageMinutes * svc.page_rate);
     if (cost <= 0) continue;
-    lines.push({ label: `${svc.name} — ${s.pageMinutes} page/min`, quantity: s.pageMinutes, unit: 'page/min', rate: r2(svc.page_rate), amount: cost });
+    lines.push({ label: `${svc.name} — ${s.pageMinutes} page/min`, quantity: s.pageMinutes, unit: 'page/min', rate: r2(svc.page_rate), amount: cost, detail: { pageMinutes: s.pageMinutes } });
   }
 
   if (s.aboutUs) {
@@ -247,7 +280,7 @@ export function computeCostLines(
   if (s.shorts > 0) {
     const rate = r2(config['short_rate'] ?? 0);
     const cost = r2(s.shorts * rate);
-    if (cost > 0) lines.push({ label: `Shorts ×${s.shorts}`, quantity: s.shorts, unit: 'short', rate, amount: cost });
+    if (cost > 0) lines.push({ label: `Shorts ×${s.shorts}`, quantity: s.shorts, unit: 'short', rate, amount: cost, detail: { quantity: s.shorts } });
   }
 
   const travel = r2(Math.max(0, s.travel));
@@ -255,7 +288,7 @@ export function computeCostLines(
 
   const permitCnt = permitCount(s);
   const permits = r2(permitCnt * (config['permit'] ?? 0));
-  if (permits > 0) lines.push({ label: `Permits ×${permitCnt}`, quantity: permitCnt, unit: 'permit', rate: r2(config['permit'] ?? 0), amount: permits });
+  if (permits > 0) lines.push({ label: `Permits ×${permitCnt}`, quantity: permitCnt, unit: 'permit', rate: r2(config['permit'] ?? 0), amount: permits, detail: { quantity: permitCnt } });
 
   const total = r2(lines.reduce((sum, l) => sum + l.amount, 0));
   return { lines, total };

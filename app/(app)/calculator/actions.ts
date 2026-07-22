@@ -90,7 +90,12 @@ export async function saveQuote(_prev: QuoteFormState, formData: FormData): Prom
   if (q.lines.length > 0) {
     const { error: itemsError } = await supabase
       .from('quote_line_items')
-      .insert(q.lines.map((line, i) => ({ ...line, quote_id: quoteId, position: i })));
+      // Explicit columns — QuoteLine also carries a display-only `detail`
+      // (budget columns) that must not reach the DB insert.
+      .insert(q.lines.map((line, i) => ({
+        label: line.label, quantity: line.quantity, unit: line.unit,
+        rate: line.rate, amount: line.amount, quote_id: quoteId, position: i,
+      })));
     if (itemsError) return { error: 'The quote saved but its line items failed. Please reopen and try again.' };
   }
 

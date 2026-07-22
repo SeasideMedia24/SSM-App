@@ -48,6 +48,25 @@ describe('computeCost', () => {
   });
 });
 
+describe('cost line detail (budget columns)', () => {
+  it('carries structured units on crew and service lines', () => {
+    const s = { ...emptySelections(), fullDays: 2, halfDays: 1, pageMinutes: 3, serviceIds: ['edit'], roles: { dp: { quantity: 1 } } };
+    const { lines } = computeCostLines(s, roles, services, config);
+    const dp = lines.find((l) => l.label.startsWith('DP'));
+    expect(dp?.detail).toEqual({ fullDays: 2, halfDays: 1, hours: undefined, quantity: undefined });
+    const edit = lines.find((l) => l.label.startsWith('Editing'));
+    expect(edit?.detail).toEqual({ pageMinutes: 3 });
+  });
+
+  it('carries quantity on ×N lines and leaves pass-throughs detail-free', () => {
+    const s = { ...emptySelections(), shorts: 2, permits: 3, travel: 100 };
+    const { lines } = computeCostLines(s, roles, services, { ...config, permit: 200 });
+    expect(lines.find((l) => l.label.startsWith('Shorts'))?.detail).toEqual({ quantity: 2 });
+    expect(lines.find((l) => l.label.startsWith('Permits'))?.detail).toEqual({ quantity: 3 });
+    expect(lines.find((l) => l.label === 'Travel / Food')?.detail).toBeUndefined();
+  });
+});
+
 describe('permits', () => {
   const cfg: PricingConfig = { markup: 2.5, permit: 200 };
 
