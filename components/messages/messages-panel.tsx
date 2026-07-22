@@ -135,19 +135,20 @@ function ChatPane({ threadId, title, messages }: { threadId: string; title: stri
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
             }}
-            rows={2}
-            placeholder="Write a message… (Enter to send, Shift+Enter for a new line)"
-            className="flex-1 resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal"
+            rows={1}
+            placeholder="Write a message…"
+            className="max-h-32 min-h-[2.75rem] flex-1 resize-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-teal"
           />
           <button
             type="button"
             disabled={pending || !body.trim()}
             onClick={send}
-            className="brand-gradient rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
+            className="brand-gradient shrink-0 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
           >
             {pending ? '…' : 'Send'}
           </button>
         </div>
+        <p className="mt-1 text-[11px] text-slate-400">Enter to send · Shift+Enter for a new line</p>
       </footer>
     </section>
   );

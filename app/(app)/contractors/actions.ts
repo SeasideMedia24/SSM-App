@@ -212,9 +212,14 @@ export async function inviteContractorLogin(contractorId: string): Promise<Invit
   // contractor (the row may have been deleted + recreated).
   const existing = await findAuthUserByEmail(admin, contractor.email);
 
-  // MUST land on /auth/confirm — that route runs the code exchange to actually
-  // establish the session, then forwards to /welcome to set a password.
+  // Build the link as a token_hash pointed at OUR /auth/confirm, which calls
+  // verifyOtp server-side and sets the session cookie. (The action_link Supabase
+  // returns routes through hosted verify, which lands the session in the URL
+  // hash — invisible to a server route — so it never logs in.) confirm then
+  // forwards to /welcome to set a password.
   const redirectTo = `${origin}/auth/confirm`;
+  const confirmUrl = (hash: string, type: 'invite' | 'magiclink') =>
+    `${origin}/auth/confirm?token_hash=${hash}&type=${type}`;
   let inviteUrl: string | undefined;
 
   if (!existing) {
@@ -223,8 +228,9 @@ export async function inviteContractorLogin(contractorId: string): Promise<Invit
       email: contractor.email,
       options: { data: { full_name: contractor.name, contractor_id: contractor.id }, redirectTo },
     });
-    inviteUrl = data?.properties?.action_link;
-    if (error || !inviteUrl) return { ok: false, message: 'Could not create the invite. Please try again.' };
+    const hash = data?.properties?.hashed_token;
+    if (error || !hash) return { ok: false, message: 'Could not create the invite. Please try again.' };
+    inviteUrl = confirmUrl(hash, 'invite');
   } else if (existing.last_sign_in_at) {
     // They've already accepted and used the login before — nothing to resend.
     if (!contractor.user_id) await admin.from('contractors').update({ user_id: existing.id }).eq('id', contractor.id);
@@ -240,8 +246,9 @@ export async function inviteContractorLogin(contractorId: string): Promise<Invit
       email: contractor.email,
       options: { redirectTo },
     });
-    inviteUrl = data?.properties?.action_link;
-    if (error || !inviteUrl) return { ok: false, message: 'Could not create a fresh link. Please try again.' };
+    const hash = data?.properties?.hashed_token;
+    if (error || !hash) return { ok: false, message: 'Could not create a fresh link. Please try again.' };
+    inviteUrl = confirmUrl(hash, 'magiclink');
   }
 
   // Email it through Resend (branded, reliable). If email isn't set up or the

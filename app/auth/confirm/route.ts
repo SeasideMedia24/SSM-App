@@ -35,7 +35,10 @@ export async function GET(req: NextRequest) {
   if (!ok) {
     return NextResponse.redirect(new URL('/login?error=link', origin));
   }
-  // Invites set a password next; other link types just enter the app.
-  const next = type === 'invite' || !type ? '/welcome' : '/dashboard';
+  // Invites AND team magic-links (a resent, never-accepted invite) go to
+  // /welcome to set a password; recovery/other types just enter the app. A
+  // ?next= override wins when present.
+  const nextParam = params.get('next');
+  const next = nextParam ?? (type === 'invite' || type === 'magiclink' || !type ? '/welcome' : '/dashboard');
   return NextResponse.redirect(new URL(next, origin));
 }
