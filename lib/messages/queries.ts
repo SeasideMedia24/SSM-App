@@ -89,6 +89,20 @@ export async function getThreadMessages(supabase: DB, threadId: string, viewerId
   });
 }
 
+export type MessageableUser = { userId: string; name: string };
+
+// Who the viewer can start a DM with (owner → team; team → owner + teammates).
+export async function messageableUsers(supabase: DB): Promise<MessageableUser[]> {
+  const { data, error } = await supabase.rpc('messageable_users');
+  if (error || !data) return [];
+  const seen = new Set<string>();
+  const out: MessageableUser[] = [];
+  for (const r of data) {
+    if (r.user_id && !seen.has(r.user_id)) { seen.add(r.user_id); out.push({ userId: r.user_id, name: r.name ?? 'Teammate' }); }
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export async function unreadCount(supabase: DB): Promise<number> {
   const { data, error } = await supabase.rpc('unread_message_count');
   if (error) return 0; // pre-migration → no badge

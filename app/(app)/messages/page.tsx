@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
 import { MessagesPanel } from '@/components/messages/messages-panel';
-import { listThreads, getThreadMessages } from '@/lib/messages/queries';
+import { NewMessageControl } from '@/components/messages/new-message-control';
+import { listThreads, getThreadMessages, messageableUsers } from '@/lib/messages/queries';
 
 // Owner Messages — every project thread + DMs with team members. Start a DM
 // from a contractor's page ("Message" button); project threads appear as soon
@@ -16,7 +17,10 @@ export default async function MessagesPage({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const threads = await listThreads(supabase, user?.id ?? '');
+  const [threads, people] = await Promise.all([
+    listThreads(supabase, user?.id ?? ''),
+    messageableUsers(supabase),
+  ]);
   const selectedId = t && threads.some((x) => x.id === t) ? t : (threads[0]?.id ?? null);
   const messages = selectedId ? await getThreadMessages(supabase, selectedId, user?.id ?? '') : [];
 
@@ -24,7 +28,8 @@ export default async function MessagesPage({
     <>
       <PageHeader
         title="Messages"
-        description="Project threads with your team, and direct messages. Start a DM from a team member’s page."
+        description="Project threads with your team, and direct messages."
+        action={<NewMessageControl people={people} basePath="/messages" />}
       />
       <MessagesPanel
         threads={threads}

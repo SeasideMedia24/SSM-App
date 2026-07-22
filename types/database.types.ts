@@ -1386,6 +1386,18 @@ export type Database = {
         Args: { pid: string };
         Returns: number;
       };
+      shares_project: {
+        Args: { other: string };
+        Returns: boolean;
+      };
+      start_dm: {
+        Args: { other: string };
+        Returns: string;
+      };
+      messageable_users: {
+        Args: Record<string, never>;
+        Returns: { user_id: string; name: string | null }[];
+      };
     };
     Enums: {
       project_status: ProjectStatus;

@@ -61,40 +61,19 @@ export async function markThreadRead(threadId: string): Promise<void> {
   revalidatePath('/messages');
 }
 
-// Owner: open (or create) the DM with a team member, then jump to it.
-export async function openDm(contractorUserId: string): Promise<void> {
-  if (!contractorUserId) return;
+// Open (or create) the 1:1 DM with another user, then jump to it. Works for the
+// owner AND team members — the start_dm function checks shares_project and
+// reuses/creates the thread + participants under SECURITY DEFINER, so no fragile
+// insert policies are needed. basePath routes to the caller's messages surface.
+export async function openDm(otherUserId: string, basePath: '/messages' | '/my-messages' = '/messages'): Promise<void> {
+  if (!otherUserId) return;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  // Reuse an existing DM with exactly this pair if one exists.
-  const { data: mine } = await supabase
-    .from('thread_participants')
-    .select('thread_id, threads!inner ( kind )')
-    .eq('user_id', contractorUserId)
-    .eq('threads.kind', 'dm');
-  let threadId = null as string | null;
-  for (const row of mine ?? []) {
-    const { data: other } = await supabase
-      .from('thread_participants')
-      .select('user_id')
-      .eq('thread_id', row.thread_id)
-      .eq('user_id', user.id)
-      .maybeSingle();
-    if (other) { threadId = row.thread_id; break; }
-  }
-
-  if (!threadId) {
-    const { data: thread, error } = await supabase.from('threads').insert({ kind: 'dm' }).select('id').single();
-    if (error || !thread) redirect('/messages?error=dm');
-    threadId = thread.id;
-    await supabase.from('thread_participants').insert([
-      { thread_id: threadId, user_id: user.id },
-      { thread_id: threadId, user_id: contractorUserId },
-    ]);
-  }
-  redirect(`/messages?t=${threadId}`);
+  const { data: threadId, error } = await supabase.rpc('start_dm', { other: otherUserId });
+  if (error || !threadId) redirect(`${basePath}?error=dm`);
+  redirect(`${basePath}?t=${threadId}`);
 }
 
 // Ensure a project's thread exists (called when someone is assigned).

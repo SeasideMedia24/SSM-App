@@ -52,7 +52,7 @@ export default async function ContractorDetailPage({
         action={
           <div className="flex items-center gap-2">
             {contractor.user_id && (
-              <form action={openDm.bind(null, contractor.user_id)}>
+              <form action={openDm.bind(null, contractor.user_id, '/messages')}>
                 <button type="submit" className={buttonClass('primary', 'sm')}>Message</button>
               </form>
             )}

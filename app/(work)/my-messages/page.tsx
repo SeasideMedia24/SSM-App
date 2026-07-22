@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { MessagesPanel } from '@/components/messages/messages-panel';
-import { listThreads, getThreadMessages } from '@/lib/messages/queries';
+import { NewMessageControl } from '@/components/messages/new-message-control';
+import { listThreads, getThreadMessages, messageableUsers } from '@/lib/messages/queries';
 
 // Team Messages — the same panel the owner uses, scoped by RLS: a team member
 // sees their projects' threads and any DMs they're part of. This works even
@@ -17,13 +18,19 @@ export default async function MyMessagesPage({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const threads = await listThreads(supabase, user?.id ?? '');
+  const [threads, people] = await Promise.all([
+    listThreads(supabase, user?.id ?? ''),
+    messageableUsers(supabase),
+  ]);
   const selectedId = t && threads.some((x) => x.id === t) ? t : (threads[0]?.id ?? null);
   const messages = selectedId ? await getThreadMessages(supabase, selectedId, user?.id ?? '') : [];
 
   return (
     <>
-      <h1 className="mb-4 text-lg font-semibold text-ink">Messages</h1>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h1 className="text-lg font-semibold text-ink">Messages</h1>
+        <NewMessageControl people={people} basePath="/my-messages" />
+      </div>
       <MessagesPanel
         threads={threads}
         selectedId={selectedId}
