@@ -118,12 +118,16 @@ export async function unassignProject(formData: FormData) {
 
 // ── Slice B1: invite a contractor to log in ──────────────────────────────────
 // Uses the ADMIN client (service role) because creating auth users is an admin
-// operation — so we explicitly verify the caller is the owner first. Supabase
-// sends the invite email itself (no email integration needed). The signup
-// trigger links the new auth user to this contractor row and stamps their
-// role as 'contractor'.
+// operation — so we explicitly verify the caller is the owner first.
+//
+// Delivery: we mint the invite link ourselves (generateLink) and email it via
+// Resend — Supabase's built-in mailer is rate-limited and silently unreliable
+// in production, which is exactly why invites "never arrived". The link is
+// ALSO returned so the owner can copy it and send it any way they like (text,
+// Slack, in person) even when email is down. The signup trigger links the new
+// auth user to this contractor row and stamps their role as 'contractor'.
 
-export type InviteLoginResult = { ok: boolean; message: string };
+export type InviteLoginResult = { ok: boolean; message: string; inviteUrl?: string };
 
 export async function inviteContractorLogin(contractorId: string): Promise<InviteLoginResult> {
   if (typeof contractorId !== 'string' || contractorId.length === 0) {
@@ -152,23 +156,41 @@ export async function inviteContractorLogin(contractorId: string): Promise<Invit
   const h = await headers();
   const proto = h.get('x-forwarded-proto') ?? 'http';
   const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000';
+  const origin = `${proto}://${host}`;
 
   const { createAdminClient } = await import('@/lib/supabase/admin');
   const admin = createAdminClient();
-  const { error } = await admin.auth.admin.inviteUserByEmail(contractor.email, {
-    data: { full_name: contractor.name, contractor_id: contractor.id },
-    redirectTo: `${proto}://${host}/welcome`,
+  const { data: linkData, error } = await admin.auth.admin.generateLink({
+    type: 'invite',
+    email: contractor.email,
+    options: {
+      data: { full_name: contractor.name, contractor_id: contractor.id },
+      redirectTo: `${origin}/welcome`,
+    },
   });
-  if (error) {
-    const already = /already.*(registered|exists)/i.test(error.message);
+  const inviteUrl = linkData?.properties?.action_link;
+  if (error || !inviteUrl) {
+    const already = /already.*(registered|exists)/i.test(error?.message ?? '');
     return {
       ok: false,
       message: already
         ? 'That email already has an account. If it’s theirs, they can just log in.'
-        : 'Could not send the invite. Please try again.',
+        : 'Could not create the invite. Please try again.',
     };
   }
 
+  // Email it through Resend (branded, reliable). If email isn't set up or the
+  // send fails, the invite STILL succeeded — hand the owner the copyable link.
+  const { sendTeamInviteEmail } = await import('@/lib/email/send');
+  const sent = await sendTeamInviteEmail({
+    origin,
+    to: contractor.email,
+    name: contractor.name,
+    inviteUrl,
+  });
+
   revalidatePath(`/contractors/${contractorId}`);
-  return { ok: true, message: `Invite emailed to ${contractor.email}.` };
+  return sent.ok
+    ? { ok: true, message: `Invite emailed to ${contractor.email}. You can also copy the link below and send it yourself.`, inviteUrl }
+    : { ok: true, message: `Invite created, but the email didn’t send (${sent.reason}). Copy the link below and send it to them directly.`, inviteUrl };
 }

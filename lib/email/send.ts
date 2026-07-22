@@ -1,6 +1,9 @@
-// Server-ONLY email sending via Resend. Two transactional emails today:
-//   sendContractEmail  — "your agreement is ready to sign" + the e-sign link
-//   sendWelcomeEmail   — post-signature welcome + the client's portal link
+// Server-ONLY email sending via Resend. Transactional emails:
+//   sendContractEmail   — "your agreement is ready to sign" + the e-sign link
+//   sendWelcomeEmail    — post-signature welcome + the client's portal link
+//   sendTeamInviteEmail — a team member's login invite (Supabase's built-in
+//                         mailer is rate-limited and unreliable in production,
+//                         so invites go through Resend like everything else)
 //
 // Graceful when unconfigured: every send returns { ok:false, reason } instead
 // of throwing, so signing/sending flows NEVER break because email isn't set up.
@@ -93,4 +96,23 @@ export async function sendWelcomeEmail(opts: {
      <p style="margin:8px 0 0;font-size:12px;color:#64748b;line-height:1.6;">Questions about anything? Just reply — a real person answers.</p>`,
   );
   return deliver(opts.to, `Welcome to Seaside Media — ${opts.projectTitle}`, html);
+}
+
+export async function sendTeamInviteEmail(opts: {
+  origin: string;
+  to: string;
+  name: string;
+  inviteUrl: string;
+}): Promise<EmailResult> {
+  const first = opts.name.split(' ')[0] || 'there';
+  const html = shell(
+    opts.origin,
+    'Your Seaside Media team login',
+    `<p style="margin:0 0 8px;line-height:1.6;">Hi ${first},</p>
+     <p style="margin:0 0 8px;line-height:1.6;">You’ve been invited to the Seaside Media team hub — your projects, tasks, and messages all live there.</p>
+     <p style="margin:0 0 8px;line-height:1.6;">Click below to set your password and get started.</p>
+     ${button(opts.inviteUrl, 'Set up my login')}
+     <p style="margin:8px 0 0;font-size:12px;color:#64748b;line-height:1.6;">This link is personal to you and expires after a while — if it stops working, ask Jeremy to send a fresh one.</p>`,
+  );
+  return deliver(opts.to, 'You’re invited — Seaside Media team hub', html);
 }
