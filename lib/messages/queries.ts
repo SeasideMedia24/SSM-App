@@ -17,7 +17,9 @@ export type ThreadSummary = {
   unread: boolean;
 };
 
-export type MessageRefChip = { kind: 'project' | 'task' | 'deliverable'; label: string };
+// `projectId` is the owning project (the ref itself for a project) so the UI can
+// link the chip through to that project — null for a standalone task with no project.
+export type MessageRefChip = { kind: 'project' | 'task' | 'deliverable'; label: string; projectId: string | null };
 
 export type ThreadMessage = {
   id: string;
@@ -98,17 +100,22 @@ export async function getThreadMessages(supabase: DB, threadId: string, viewerId
     .limit(500);
   const rows = data ?? [];
 
-  // Resolve any referenced items to a title (batched per table).
+  // Resolve any referenced items to a title + owning project (batched per table).
   const idsByType: Record<string, string[]> = { project: [], task: [], deliverable: [] };
   for (const m of rows) if (m.ref_type && m.ref_id && idsByType[m.ref_type]) idsByType[m.ref_type].push(m.ref_id);
-  const titles = new Map<string, string>(); // `${type}:${id}` → title
+  const resolved = new Map<string, { title: string; projectId: string | null }>(); // `${type}:${id}` → …
   await Promise.all(
     (['project', 'task', 'deliverable'] as const).map(async (type) => {
       const ids = [...new Set(idsByType[type])];
       if (ids.length === 0) return;
-      const table = type === 'project' ? 'projects' : type === 'task' ? 'tasks' : 'deliverables';
-      const { data: items } = await supabase.from(table).select('id, title').in('id', ids);
-      for (const it of items ?? []) titles.set(`${type}:${it.id}`, it.title);
+      if (type === 'project') {
+        const { data: items } = await supabase.from('projects').select('id, title').in('id', ids);
+        for (const it of items ?? []) resolved.set(`project:${it.id}`, { title: it.title, projectId: it.id });
+      } else {
+        const table = type === 'task' ? 'tasks' : 'deliverables';
+        const { data: items } = await supabase.from(table).select('id, title, project_id').in('id', ids);
+        for (const it of items ?? []) resolved.set(`${type}:${it.id}`, { title: it.title, projectId: it.project_id });
+      }
     }),
   );
 
@@ -116,14 +123,14 @@ export async function getThreadMessages(supabase: DB, threadId: string, viewerId
     const prof = m.profiles as unknown as { full_name: string | null } | { full_name: string | null }[] | null;
     const name = Array.isArray(prof) ? prof[0]?.full_name : prof?.full_name;
     const kind = m.ref_type as MessageRefChip['kind'] | null;
-    const label = kind && m.ref_id ? titles.get(`${kind}:${m.ref_id}`) : undefined;
+    const hit = kind && m.ref_id ? resolved.get(`${kind}:${m.ref_id}`) : undefined;
     return {
       id: m.id,
       body: m.body,
       createdAt: m.created_at,
       mine: m.sender_id === viewerId,
       senderName: name ?? 'Someone',
-      ref: kind && label ? { kind, label } : undefined,
+      ref: kind && hit ? { kind, label: hit.title, projectId: hit.projectId } : undefined,
     };
   });
 }

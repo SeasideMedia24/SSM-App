@@ -12,6 +12,17 @@ import type { ThreadSummary, ThreadMessage, AttachableItems } from '@/lib/messag
 
 const REF_ICON: Record<MessageRef['type'], string> = { project: '📁', task: '✅', deliverable: '🎬' };
 
+// Where an attachment chip links to. The owner reaches the project detail page
+// (jumping straight to the matching sub-tab); the team only has their hub, so
+// every kind lands them on /my-work where the item lives.
+function refHref(basePath: string, chip: { kind: MessageRef['type']; projectId: string | null }): string {
+  const owner = basePath === '/messages';
+  if (!owner) return '/my-work';
+  if (!chip.projectId) return chip.kind === 'task' ? '/tasks' : '/projects';
+  const view = chip.kind === 'task' ? '?view=tasks' : chip.kind === 'deliverable' ? '?view=deliverables' : '';
+  return `/projects/${chip.projectId}${view}`;
+}
+
 function timeLabel(iso: string): string {
   const d = new Date(iso);
   const today = new Date();
@@ -128,10 +139,14 @@ function ChatPane({ threadId, title, messages, attachable, basePath }: { threadI
             <div className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm ${m.mine ? 'brand-gradient text-white' : 'bg-slate-100 text-slate-800'}`}>
               {!m.mine && <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide opacity-70">{m.senderName}</p>}
               {m.ref && (
-                <p className={`mb-1 inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs ${m.mine ? 'bg-white/20' : 'bg-white'}`}>
+                <Link
+                  href={refHref(basePath, m.ref)}
+                  className={`mb-1 inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs transition ${m.mine ? 'bg-white/20 hover:bg-white/30' : 'bg-white hover:bg-slate-50'}`}
+                  title={`Open ${m.ref.label}`}
+                >
                   <span>{REF_ICON[m.ref.kind]}</span>
-                  <span className="font-medium">{m.ref.label}</span>
-                </p>
+                  <span className="font-medium underline-offset-2 hover:underline">{m.ref.label}</span>
+                </Link>
               )}
               <p className="whitespace-pre-wrap">{m.body}</p>
             </div>
