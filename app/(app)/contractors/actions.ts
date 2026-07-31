@@ -143,6 +143,26 @@ export async function setContractorClearance(contractorId: string, level: number
   return { ok: true };
 }
 
+// ── Budget visibility ────────────────────────────────────────────────────────
+// A deliberate, off-by-default per-person grant — independent of clearance. When
+// on, RLS (can_see_project_budget) lets them read the quotes of projects they're
+// assigned to. Owner only, verified here AND enforced by RLS.
+
+const MIGRATION_HINT_BUDGET =
+  'Budget access needs a quick database update — run supabase/migrations/20260723000004_budget_permission.sql in the Supabase SQL Editor, then try again.';
+
+export async function setContractorBudgetAccess(contractorId: string, canSee: boolean): Promise<ClearanceResult> {
+  if (!contractorId) return { ok: false, message: 'Missing contractor.' };
+  const supabase = await createSupabaseServer();
+  const { getAppRole } = await import('@/lib/auth/role');
+  if ((await getAppRole(supabase)) !== 'owner') return { ok: false, message: 'Owner only.' };
+
+  const { error } = await supabase.from('contractors').update({ can_see_budget: canSee }).eq('id', contractorId);
+  if (error) return { ok: false, message: error.code === '42703' ? MIGRATION_HINT_BUDGET : 'Could not save. Please try again.' };
+  revalidatePath(`/contractors/${contractorId}`);
+  return { ok: true };
+}
+
 export async function setAssignmentClearance(
   assignmentId: string,
   contractorId: string,

@@ -566,6 +566,7 @@ export type Database = {
           onboarded_at: string | null;
           user_id: string | null;
           clearance: number;
+          can_see_budget: boolean;
           created_at: string;
         };
         Insert: {
@@ -583,6 +584,7 @@ export type Database = {
           onboarded_at?: string | null;
           user_id?: string | null;
           clearance?: number;
+          can_see_budget?: boolean;
           created_at?: string;
         };
         Update: {
@@ -600,6 +602,7 @@ export type Database = {
           onboarded_at?: string | null;
           user_id?: string | null;
           clearance?: number;
+          can_see_budget?: boolean;
           created_at?: string;
         };
         Relationships: [

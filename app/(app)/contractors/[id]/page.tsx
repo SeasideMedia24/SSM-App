@@ -7,6 +7,7 @@ import { DeleteContractorButton } from '@/components/contractors/delete-contract
 import { OnboardLinkControl } from '@/components/contractors/onboard-link-control';
 import { InviteLoginControl } from '@/components/contractors/invite-login-control';
 import { ClearancePicker, AssignmentClearancePicker } from '@/components/contractors/clearance-picker';
+import { BudgetPermissionToggle } from '@/components/contractors/budget-permission-toggle';
 import { assignProject, unassignProject } from '../actions';
 import { openDm } from '@/app/(app)/messages/actions';
 import { contractorTypeMeta } from '@/lib/projects/status';
@@ -100,6 +101,9 @@ export default async function ContractorDetailPage({
         <InviteLoginControl contractorId={contractor.id} email={contractor.email} linked={!!contractor.user_id} />
         <div className="mt-4 border-t border-slate-100 pt-4">
           <ClearancePicker contractorId={contractor.id} level={(contractor.clearance as number | null) ?? 1} />
+        </div>
+        <div className="mt-4 border-t border-slate-100 pt-4">
+          <BudgetPermissionToggle contractorId={contractor.id} canSee={(contractor.can_see_budget as boolean | null) ?? false} />
         </div>
       </section>
 
