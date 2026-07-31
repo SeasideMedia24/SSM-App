@@ -11,6 +11,7 @@ import { DeleteProjectButton } from '@/components/projects/delete-project-button
 import { ViewSwitcher } from '@/components/projects/view-switcher';
 import { TasksPanel } from '@/components/projects/tasks-panel';
 import { DeliverablesPanel, ContractsPanel } from '@/components/projects/panels';
+import { BoardsPanel } from '@/components/projects/boards-panel';
 import { QuoteBudget } from '@/components/projects/quote-budget';
 import { ProjectPriorityControl } from '@/components/projects/priority-picker';
 import { ArchiveControl } from '@/components/projects/archive-control';
@@ -48,7 +49,7 @@ export default async function ProjectDetailPage({
   const [
     { data: tasks }, { data: deliverables }, { data: contracts },
     { data: quotes }, { data: roles }, { data: services }, { data: configRows },
-    { data: teamLogins }, { data: portal },
+    { data: teamLogins }, { data: portal }, { data: boards },
   ] = await Promise.all([
     supabase.from('tasks').select('id, title, status, priority, due_date, assignee_id, worker_note').eq('project_id', id).order('created_at'),
     supabase.from('deliverables').select('*').eq('project_id', id).order('position'),
@@ -61,6 +62,8 @@ export default async function ProjectDetailPage({
     supabase.from('contractors').select('name, user_id').not('user_id', 'is', null).order('name'),
     // Client portal (table may not exist pre-migration — handled gracefully).
     supabase.from('client_portal').select('portal_token, brand, tech, links, submitted_at, review_link').eq('project_id', id).maybeSingle(),
+    // Canvas boards linked to this project (empty pre-migration — handled gracefully).
+    supabase.from('boards').select('id, kind, title, updated_at').eq('project_id', id).order('updated_at', { ascending: false }),
   ]);
 
   // If the client has submitted portal details, pull their files and sign
@@ -98,11 +101,13 @@ export default async function ProjectDetailPage({
   };
   const budgetRows = (quotes ?? []).map((q) => quoteBudgetRow(q, pricing));
 
+  const boardList = boards ?? [];
   const counts = {
     tasks: taskList.length,
     deliverables: (deliverables ?? []).length,
     contracts: (contracts ?? []).length,
     budget: budgetRows.length,
+    boards: boardList.length,
   };
 
   return (
@@ -149,15 +154,17 @@ export default async function ProjectDetailPage({
       {view === 'deliverables' && <DeliverablesPanel projectId={project.id} items={deliverables ?? []} assignees={assignees} />}
       {view === 'contracts' && <ContractsPanel projectId={project.id} items={contracts ?? []} />}
       {view === 'budget' && <QuoteBudget rows={budgetRows} />}
+      {view === 'boards' && <BoardsPanel projectId={project.id} boards={boardList} canEdit />}
 
       {view === 'overview' && (
         <div className="space-y-6">
           {/* Clickable stat boxes → jump straight into each view */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             <StatLink id={project.id} view="tasks" label="Tasks" value={counts.tasks} />
             <StatLink id={project.id} view="deliverables" label="Deliverables" value={counts.deliverables} />
             <StatLink id={project.id} view="contracts" label="Contracts" value={counts.contracts} />
             <StatLink id={project.id} view="budget" label="Quotes" value={counts.budget} />
+            <StatLink id={project.id} view="boards" label="Boards" value={counts.boards} />
           </div>
           {project.description && (
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

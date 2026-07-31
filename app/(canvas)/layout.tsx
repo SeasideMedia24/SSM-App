@@ -1,10 +1,11 @@
 // Full-screen shell for the Brainstorming canvas — deliberately OUTSIDE the app
-// sidebar chrome so the board can fill the screen. Same owner-only auth gate as
-// the app layout (defense in depth alongside the proxy).
+// sidebar chrome so the board can fill the screen. Auth-gated; RLS then scopes
+// what each viewer sees: the owner reaches every board, a team member only the
+// boards of projects they're assigned to (view at L1, edit at L2+). See
+// migration 20260731000001_boards_projects.sql.
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { getAppRole } from '@/lib/auth/role';
 
 export default async function CanvasLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -12,7 +13,6 @@ export default async function CanvasLayout({ children }: { children: React.React
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
-  if ((await getAppRole(supabase)) === 'contractor') redirect('/my-work');
 
   return <div className="min-h-screen bg-white">{children}</div>;
 }

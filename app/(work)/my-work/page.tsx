@@ -7,8 +7,10 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { MyTaskRow, type MyTask } from '@/components/work/my-task-row';
 import { TaskTimeline } from '@/components/work/task-timeline';
+import { BoardsPanel, type ProjectBoard } from '@/components/projects/boards-panel';
 import { BrandLogo } from '@/components/brand-logo';
 import { unreadCount } from '@/lib/messages/queries';
+import { effectiveClearance } from '@/lib/auth/clearance';
 import { projectStatusMeta } from '@/lib/projects/status';
 import { fmtDate } from '@/lib/projects/format';
 import type { ProjectStatus, TaskStatus } from '@/types/database.types';
@@ -20,18 +22,32 @@ export default async function MyWorkPage() {
   } = await supabase.auth.getUser();
 
   // RLS scopes every one of these to the signed-in contractor's world.
-  const [{ data: profile }, { data: assignments }, { data: projects }, { data: tasks }, { data: deliverables }, { data: milestones }, unread] =
+  const [{ data: profile }, { data: assignments }, { data: projects }, { data: tasks }, { data: deliverables }, { data: milestones }, { data: myContractor }, { data: boards }, unread] =
     await Promise.all([
       supabase.from('profiles').select('full_name').eq('id', user?.id ?? '').maybeSingle(),
-      supabase.from('project_contractors').select('project_id, role'),
+      supabase.from('project_contractors').select('project_id, role, clearance'),
       supabase.from('projects').select('id, title, status, description, start_date, due_date').order('due_date', { nullsFirst: false }),
       supabase.from('tasks').select('id, project_id, title, status, priority, due_date, worker_note, assignee_id').order('due_date', { nullsFirst: false }),
       supabase.from('deliverables').select('id, project_id, title, status, due_date, assignee_id').order('due_date', { nullsFirst: false }),
       supabase.from('milestones').select('id, project_id, title, status, date').order('date'),
+      // My default clearance (owner grants edit at L2+); boards are RLS-scoped to my projects.
+      supabase.from('contractors').select('clearance').eq('user_id', user?.id ?? '').maybeSingle(),
+      supabase.from('boards').select('id, kind, title, updated_at, project_id').order('updated_at', { ascending: false }),
       unreadCount(supabase),
     ]);
 
   const roleByProject = new Map((assignments ?? []).map((a) => [a.project_id, a.role]));
+  // Effective clearance per project = per-assignment override ?? my default. Drives
+  // whether the Boards section lets me create/edit (L2+) or just view (L1).
+  const myDefaultClearance = (myContractor?.clearance as number | null) ?? 1;
+  const clearanceByProject = new Map((assignments ?? []).map((a) => [a.project_id, effectiveClearance(myDefaultClearance, a.clearance)]));
+  const boardsByProject = new Map<string, ProjectBoard[]>();
+  for (const b of boards ?? []) {
+    if (!b.project_id) continue;
+    const list = boardsByProject.get(b.project_id) ?? [];
+    list.push({ id: b.id, kind: b.kind, title: b.title, updated_at: b.updated_at });
+    boardsByProject.set(b.project_id, list);
+  }
   const projectList = projects ?? [];
   const my = (t: { assignee_id: string | null }) => t.assignee_id === user?.id;
 
@@ -99,6 +115,8 @@ export default async function MyWorkPage() {
           const pDeliv = (deliverables ?? []).filter((d) => d.project_id === p.id);
           const pMiles = (milestones ?? []).filter((m) => m.project_id === p.id);
           const myRole = roleByProject.get(p.id);
+          const pBoards = boardsByProject.get(p.id) ?? [];
+          const pCanEditBoards = (clearanceByProject.get(p.id) ?? 1) >= 2;
 
           return (
             <section key={p.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -150,6 +168,13 @@ export default async function MyWorkPage() {
                       </ul>
                     </div>
                   )}
+                </div>
+              )}
+
+              {(pBoards.length > 0 || pCanEditBoards) && (
+                <div className="mt-4">
+                  <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">Boards</p>
+                  <BoardsPanel projectId={p.id} boards={pBoards} canEdit={pCanEditBoards} />
                 </div>
               )}
             </section>

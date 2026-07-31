@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getAppRole } from '@/lib/auth/role';
 import { Canvas } from '@/components/brainstorm/canvas';
 import { BoardTitle } from '@/components/brainstorm/board-title';
 import type { ItemData } from '@/components/brainstorm/canvas-item';
@@ -31,6 +32,13 @@ export default async function BoardPage({ params }: { params: Promise<{ boardId:
   const { data: board } = await supabase.from('boards').select('id, kind, title').eq('id', boardId).maybeSingle();
   if (!board) notFound();
 
+  // Owner + L2 team members may edit; L1 team members view read-only. The owner
+  // is always editable (and tolerant of the RPC not existing pre-migration);
+  // contractors are gated by can_edit_board (RLS-backed).
+  const role = await getAppRole(supabase);
+  const { data: canEditRpc } = await supabase.rpc('can_edit_board', { bid: boardId });
+  const canEdit = role === 'owner' ? true : (canEditRpc ?? false);
+
   const { data: rows } = await supabase
     .from('board_items')
     .select('id, type, x, y, w, h, z, rotation, content')
@@ -53,7 +61,7 @@ export default async function BoardPage({ params }: { params: Promise<{ boardId:
         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium capitalize text-slate-500">{board.kind}</span>
       </div>
       <div className="relative flex-1">
-        <Canvas boardId={board.id} initialItems={items} initialUrls={urls} timeline={board.kind === 'storyline'} />
+        <Canvas boardId={board.id} initialItems={items} initialUrls={urls} timeline={board.kind === 'storyline'} canEdit={canEdit ?? false} />
       </div>
     </div>
   );

@@ -27,13 +27,14 @@ const NEW_LINK = { w: 260, h: 150 };
 const NEW_MEDIA = { w: 280, h: 200 };
 
 export function Canvas({
-  boardId, initialItems, initialUrls, timeline = false, compact = false,
+  boardId, initialItems, initialUrls, timeline = false, compact = false, canEdit = true,
 }: {
   boardId: string;
   initialItems: ItemData[];
   initialUrls: Record<string, string>; // storage_path → signed url
   timeline?: boolean;
   compact?: boolean;
+  canEdit?: boolean; // false → read-only (L1 team member); pan/zoom only
 }) {
   const [items, setItems] = useState<ItemData[]>(initialItems);
   const [urls, setUrls] = useState<Record<string, string>>(initialUrls);
@@ -121,6 +122,7 @@ export function Canvas({
 
   // ── Pointer: pan / move / resize ─────────────────────────────────────────────
   const onItemPointerDown = (e: React.PointerEvent, id: string, mode: 'move' | 'resize') => {
+    if (!canEdit) return; // read-only: let the drag fall through to background pan
     e.stopPropagation();
     select(id);
     const it = items.find((i) => i.id === id);
@@ -195,15 +197,20 @@ export function Canvas({
         {!compact && (
           <Link href="/brainstorm" className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-100" title="Back to boards">←</Link>
         )}
-        <ToolBtn onClick={addNote} label="Note" />
-        <ToolBtn onClick={() => pickFile('image')} label="Image" />
-        <ToolBtn onClick={() => pickFile('file')} label="File" />
-        <ToolBtn onClick={addLink} label="Link" />
-        <span className="mx-1 h-5 w-px bg-slate-200" />
+        {canEdit && (
+          <>
+            <ToolBtn onClick={addNote} label="Note" />
+            <ToolBtn onClick={() => pickFile('image')} label="Image" />
+            <ToolBtn onClick={() => pickFile('file')} label="File" />
+            <ToolBtn onClick={addLink} label="Link" />
+            <span className="mx-1 h-5 w-px bg-slate-200" />
+          </>
+        )}
         <ToolBtn onClick={() => zoomBy(1 / 1.2)} label="−" />
         <span className="w-10 text-center text-xs tabular-nums text-slate-500">{Math.round(vp.scale * 100)}%</span>
         <ToolBtn onClick={() => zoomBy(1.2)} label="+" />
-        {selected && <ToolBtn onClick={removeSelected} label="Delete" danger />}
+        {canEdit && selected && <ToolBtn onClick={removeSelected} label="Delete" danger />}
+        {!canEdit && <span className="px-2 text-xs font-medium text-slate-400">View only</span>}
       </div>
 
       <input ref={fileInput} type="file" multiple hidden onChange={(e) => onFileChosen(e.target.files)} />
@@ -231,6 +238,7 @@ export function Canvas({
               item={it}
               url={typeof it.content.storage_path === 'string' ? urls[it.content.storage_path] ?? null : null}
               selected={selected === it.id}
+              editable={canEdit}
               onPointerDownMove={(e) => onItemPointerDown(e, it.id, 'move')}
               onPointerDownResize={(e) => onItemPointerDown(e, it.id, 'resize')}
               onChange={(patch) => commitPatch(it.id, patch)}

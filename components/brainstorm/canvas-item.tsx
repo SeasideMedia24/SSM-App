@@ -25,11 +25,12 @@ const NOTE_COLORS: Record<string, { body: string; head: string }> = {
 const stop = (e: React.PointerEvent) => e.stopPropagation();
 
 export function CanvasItem({
-  item, url, selected, onPointerDownMove, onPointerDownResize, onChange,
+  item, url, selected, editable = true, onPointerDownMove, onPointerDownResize, onChange,
 }: {
   item: ItemData;
   url: string | null;
   selected: boolean;
+  editable?: boolean;
   onPointerDownMove: (e: React.PointerEvent) => void;
   onPointerDownResize: (e: React.PointerEvent) => void;
   onChange: (patch: Partial<ItemData>) => void;
@@ -43,9 +44,9 @@ export function CanvasItem({
       className={`absolute overflow-hidden rounded-xl border bg-white shadow-sm ${selected ? 'border-teal ring-2 ring-teal/30' : 'border-slate-200'}`}
       style={{ left: item.x, top: item.y, width: item.w, height: item.h, zIndex: item.z, transform: item.rotation ? `rotate(${item.rotation}deg)` : undefined }}
     >
-      {/* Drag handle */}
-      <div onPointerDown={onPointerDownMove} className={`flex h-6 cursor-grab items-center gap-1 px-2 active:cursor-grabbing ${headTint}`}>
-        {item.type === 'note' && selected && (
+      {/* Drag handle (inert when read-only) */}
+      <div onPointerDown={onPointerDownMove} className={`flex h-6 items-center gap-1 px-2 ${editable ? 'cursor-grab active:cursor-grabbing' : ''} ${headTint}`}>
+        {item.type === 'note' && selected && editable && (
           <span className="flex gap-1" onPointerDown={stop}>
             {Object.keys(NOTE_COLORS).map((c) => (
               <button key={c} type="button" onClick={() => setContent({ color: c })} className={`h-3 w-3 rounded-full ring-1 ring-black/10 ${NOTE_COLORS[c].head}`} aria-label={`${c} note`} />
@@ -61,7 +62,8 @@ export function CanvasItem({
             value={String(item.content.text ?? '')}
             onChange={(e) => setContent({ text: e.target.value })}
             onPointerDown={stop}
-            placeholder="Type…"
+            readOnly={!editable}
+            placeholder={editable ? 'Type…' : ''}
             className={`h-full w-full resize-none border-0 p-2.5 text-sm text-slate-800 outline-none ${NOTE_COLORS[color]?.body ?? 'bg-amber-50'}`}
           />
         )}
@@ -79,25 +81,27 @@ export function CanvasItem({
           </div>
         )}
 
-        {item.type === 'link' && <LinkBody url={String(item.content.url ?? '')} onSet={(u) => setContent({ url: u })} />}
-        {item.type === 'embed' && <LinkBody url={String(item.content.url ?? '')} onSet={(u) => setContent({ url: u })} />}
+        {item.type === 'link' && <LinkBody url={String(item.content.url ?? '')} editable={editable} onSet={(u) => setContent({ url: u })} />}
+        {item.type === 'embed' && <LinkBody url={String(item.content.url ?? '')} editable={editable} onSet={(u) => setContent({ url: u })} />}
       </div>
 
-      {/* Resize handle */}
-      <div
-        onPointerDown={onPointerDownResize}
-        className="absolute bottom-0 right-0 h-4 w-4 cursor-nwse-resize"
-        style={{ background: 'linear-gradient(135deg, transparent 50%, #94a3b8 50%)' }}
-      />
+      {/* Resize handle (edit only) */}
+      {editable && (
+        <div
+          onPointerDown={onPointerDownResize}
+          className="absolute bottom-0 right-0 h-4 w-4 cursor-nwse-resize"
+          style={{ background: 'linear-gradient(135deg, transparent 50%, #94a3b8 50%)' }}
+        />
+      )}
     </div>
   );
 }
 
-function LinkBody({ url, onSet }: { url: string; onSet: (u: string) => void }) {
+function LinkBody({ url, editable = true, onSet }: { url: string; editable?: boolean; onSet: (u: string) => void }) {
   const [editing, setEditing] = useState(!url);
   const [draft, setDraft] = useState(url);
 
-  if (editing) {
+  if (editing && editable) {
     return (
       <form
         onPointerDown={(e) => e.stopPropagation()}

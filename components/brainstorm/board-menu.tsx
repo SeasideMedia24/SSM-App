@@ -8,7 +8,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBoard, deleteBoard, type BoardKind } from '@/app/(canvas)/brainstorm/actions';
 
-type Board = { id: string; kind: string; title: string; updated_at: string };
+type Board = { id: string; kind: string; title: string; updated_at: string; projectTitle?: string | null };
 
 const TABS: { kind: BoardKind; label: string; blurb: string }[] = [
   { kind: 'storyboard', label: 'Storyboard', blurb: 'Frames, references, and the shape of each scene.' },
@@ -106,6 +106,7 @@ export function BoardMenu({ boards }: { boards: Board[] }) {
               <button type="button" onClick={() => router.push(`/brainstorm/${b.id}`)} className="block w-full text-left">
                 <div className="flex h-24 items-center justify-center rounded-xl bg-[radial-gradient(circle,_#cbd5e1_1px,_transparent_1px)] [background-size:14px_14px]" />
                 <p className="mt-3 truncate text-sm font-semibold text-ink">{b.title}</p>
+                {b.projectTitle && <p className="mt-0.5 truncate text-xs font-medium text-sea">📁 {b.projectTitle}</p>}
                 <p className="mt-0.5 text-xs text-slate-400">Updated {new Date(b.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
               </button>
               <button type="button" onClick={() => remove(b.id)} disabled={pending} className="mt-2 text-xs text-slate-400 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100">

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getAppRole } from '@/lib/auth/role';
 import { Canvas } from '@/components/brainstorm/canvas';
 import type { ItemData } from '@/components/brainstorm/canvas-item';
 import type { ItemType } from '@/app/(canvas)/brainstorm/actions';
@@ -26,6 +27,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   if (idList.length === 0) redirect('/brainstorm');
 
   const supabase = await createClient();
+  const role = await getAppRole(supabase);
   const loaded = await Promise.all(
     idList.map(async (id) => {
       const { data: board } = await supabase.from('boards').select('id, kind, title').eq('id', id).maybeSingle();
@@ -40,7 +42,9 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
         x: Number(r.x), y: Number(r.y), w: Number(r.w), h: Number(r.h), z: r.z, rotation: Number(r.rotation),
         content: (r.content as Record<string, unknown>) ?? {},
       }));
-      return { board, items, urls: await signMedia(items) };
+      const { data: canEditRpc } = await supabase.rpc('can_edit_board', { bid: id });
+      const canEdit = role === 'owner' ? true : (canEditRpc ?? false);
+      return { board, items, urls: await signMedia(items), canEdit };
     }),
   );
   const boards = loaded.filter((b): b is NonNullable<typeof b> => b !== null);
@@ -53,14 +57,14 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
         <span className="text-sm font-semibold text-ink">Comparing {boards.length} board{boards.length === 1 ? '' : 's'}</span>
       </div>
       <div className="flex flex-1 divide-x divide-slate-200">
-        {boards.map(({ board, items, urls }) => (
+        {boards.map(({ board, items, urls, canEdit }) => (
           <div key={board.id} className="flex min-w-0 flex-1 flex-col">
             <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-1.5">
               <Link href={`/brainstorm/${board.id}`} className="truncate text-xs font-semibold text-slate-700 hover:text-sea">{board.title}</Link>
               <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium capitalize text-slate-500">{board.kind}</span>
             </div>
             <div className="relative flex-1">
-              <Canvas boardId={board.id} initialItems={items} initialUrls={urls} timeline={board.kind === 'storyline'} compact />
+              <Canvas boardId={board.id} initialItems={items} initialUrls={urls} timeline={board.kind === 'storyline'} compact canEdit={canEdit} />
             </div>
           </div>
         ))}

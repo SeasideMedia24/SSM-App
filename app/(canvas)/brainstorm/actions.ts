@@ -17,16 +17,17 @@ const BUCKET = 'brainstorm-media';
 const KINDS: BoardKind[] = ['storyboard', 'shotlist', 'brainstorm', 'storyline'];
 const TYPES: ItemType[] = ['note', 'image', 'file', 'link', 'embed'];
 
-export async function createBoard(kind: BoardKind, title?: string): Promise<{ id: string }> {
+export async function createBoard(kind: BoardKind, title?: string, projectId?: string | null): Promise<{ id: string }> {
   if (!KINDS.includes(kind)) throw new Error('Unknown board kind.');
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('boards')
-    .insert({ kind, title: (title ?? '').trim() || 'Untitled' })
+    .insert({ kind, title: (title ?? '').trim() || 'Untitled', project_id: projectId ?? null })
     .select('id')
     .single();
   if (error || !data) throw new Error('Could not create the board.');
   revalidatePath('/brainstorm');
+  if (projectId) { revalidatePath(`/projects/${projectId}`); revalidatePath('/my-work'); }
   return { id: data.id };
 }
 
@@ -83,10 +84,11 @@ const safeName = (name: string) => name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-
 export type UploadTicket = { ok: true; path: string; token: string } | { ok: false; error: string };
 
 export async function requestMediaUpload(boardId: string, filename: string): Promise<UploadTicket> {
-  // Confirm the board exists and the caller is authenticated (RLS on the read).
+  // Confirm the caller may EDIT this board before minting an upload (the admin
+  // client bypasses storage RLS, so gate here). can_edit_board = owner or L2+.
   const supabase = await createClient();
-  const { data: board } = await supabase.from('boards').select('id').eq('id', boardId).maybeSingle();
-  if (!board) return { ok: false, error: 'That board no longer exists.' };
+  const { data: canEdit } = await supabase.rpc('can_edit_board', { bid: boardId });
+  if (!canEdit) return { ok: false, error: 'You can’t add media to this board.' };
 
   const admin = createAdminClient();
   const path = `${boardId}/${crypto.randomUUID()}-${safeName(filename || 'file')}`;

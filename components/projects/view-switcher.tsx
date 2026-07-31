@@ -13,6 +13,7 @@ export const PROJECT_VIEWS = [
   { key: 'deliverables', label: 'Deliverables' },
   { key: 'contracts', label: 'Contracts' },
   { key: 'budget', label: 'Budget' },
+  { key: 'boards', label: 'Boards' },
 ] as const;
 
 export function ViewSwitcher({ active }: { active: string }) {

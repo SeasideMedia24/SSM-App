@@ -35,6 +35,7 @@ export type Database = {
           id: string;
           kind: 'storyboard' | 'shotlist' | 'brainstorm' | 'storyline';
           title: string;
+          project_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -42,6 +43,7 @@ export type Database = {
           id?: string;
           kind: 'storyboard' | 'shotlist' | 'brainstorm' | 'storyline';
           title?: string;
+          project_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -49,10 +51,18 @@ export type Database = {
           id?: string;
           kind?: 'storyboard' | 'shotlist' | 'brainstorm' | 'storyline';
           title?: string;
+          project_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'boards_project_id_fkey';
+            columns: ['project_id'];
+            referencedRelation: 'projects';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       board_items: {
         Row: {
@@ -1400,6 +1410,14 @@ export type Database = {
       messageable_users: {
         Args: Record<string, never>;
         Returns: { user_id: string; name: string | null }[];
+      };
+      can_access_board: {
+        Args: { bid: string };
+        Returns: boolean;
+      };
+      can_edit_board: {
+        Args: { bid: string };
+        Returns: boolean;
       };
     };
     Enums: {
