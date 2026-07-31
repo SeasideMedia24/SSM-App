@@ -29,8 +29,22 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
 const label = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
 export function TaskTimeline({ tasks }: { tasks: TimelineTask[] }) {
+  // No open tasks at all → nothing to schedule; the page's other empty states cover it.
+  if (tasks.length === 0) return null;
+
   const dated = tasks.filter((t) => t.due_date);
-  if (dated.length === 0) return null;
+  // Has open tasks but none carry a due date → show the section with a hint,
+  // rather than vanishing (which looked like a broken/missing timeline).
+  if (dated.length === 0) {
+    return (
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-1 text-sm font-semibold text-ink">Your timeline</h2>
+        <p className="text-xs text-slate-400">
+          None of your open tasks have a due date yet — add one and it’ll appear here, laid out week by week.
+        </p>
+      </section>
+    );
+  }
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const todayIso = iso(today);
